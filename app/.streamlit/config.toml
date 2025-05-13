@@ -1,0 +1,9 @@
+[theme]
+primaryColor = "#8bbc35"  # Green for interactive elements
+backgroundColor = "#ffffff"  # White background
+secondaryBackgroundColor = "#f0f2f6"  # Light gray for secondary elements
+textColor = "#044c7c"  # Dark blue for text
+font = "sans serif"
+
+[server]
+enableStaticServing = true
