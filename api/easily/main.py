@@ -80,7 +80,7 @@ def get_db_connection():
         raise HTTPException(
             status_code=500,
             detail=f"Erreur de connexion à la base de données: {str(e)}",
-        )
+        ) from None
 
 
 # Point de terminaison de diagnostic
@@ -136,9 +136,7 @@ def execute_query(conn, start_date=None, end_date=None, venues=None):
     cursor = conn.cursor()
 
     # Déterminer s'il faut appliquer le filtre de date ou le filtre par numéros de séjour
-    include_second_part = (
-        True  # Flag pour inclure la deuxième partie de la requête (sans venue)
-    )
+    include_second_part = True  # Flag pour inclure la deuxième partie de la requête (sans venue)
 
     # Condition de base pour la date
     date_condition = ""
@@ -157,9 +155,7 @@ def execute_query(conn, start_date=None, end_date=None, venues=None):
     else:
         # Sinon, on applique le filtre de date
         if start_date and end_date:
-            date_condition = (
-                f"s2.sej_date_sortie BETWEEN '{start_date}' AND '{end_date}'"
-            )
+            date_condition = f"s2.sej_date_sortie BETWEEN '{start_date}' AND '{end_date}'"
         else:
             date_condition = "YEAR(s2.sej_date_sortie) = YEAR(GETDATE())"
 
@@ -173,7 +169,7 @@ def execute_query(conn, start_date=None, end_date=None, venues=None):
         year(s2.sej_date_sortie) AS annee,
         DateName(Month,s2.sej_date_sortie) AS mois,
         datediff(day,s2.sej_date_sortie,date_min_val) AS LL_J0,
-        CASE 
+        CASE
             WHEN s1.sej_date_entree >= ven_admission THEN datediff(day,s1.sej_date_entree,s2.sej_date_sortie)
             WHEN s1.sej_date_entree < ven_admission THEN datediff(day,ven_admission,s2.sej_date_sortie)
         END AS nuit_1,
@@ -223,12 +219,12 @@ def execute_query(conn, start_date=None, end_date=None, venues=None):
             WHEN dfs.fos_libelle ='CR Lettre de Liaison NRDT Foch' THEN 'NEUROCHIRURGIE'
             WHEN dfs.fos_libelle ='CR Lettre de Liaison Neurochirurgie Foch' THEN 'NEUROCHIRURGIE'
             WHEN dfs.fos_libelle ='CR Urgences' THEN 'URGENCES'
-            ELSE cr4.cr_libelle_long 
+            ELSE cr4.cr_libelle_long
         END AS CR_Doss_spe,
         f.fic_date_creation,
         f.fic_date_modification,
         fhs2.date_min_val
-    FROM 
+    FROM
         /*jointure sur les venues*/
         NOYAU.patient.VENUE v
         LEFT JOIN NOYAU.patient.SEJOUR s1 ON s1.ven_id = v.ven_id 
@@ -293,11 +289,11 @@ def execute_query(conn, start_date=None, end_date=None, venues=None):
     UNION
 
     /*Sans venue*/
-    SELECT DISTINCT 
+    SELECT DISTINCT
         year(s2.sej_date_sortie) AS annee,
         DateName(Month, s2.sej_date_sortie) AS mois,
         datediff(day, s2.sej_date_sortie, date_min_val) AS LL_J0,
-        CASE 
+        CASE
             WHEN s1.sej_date_entree >= ven_admission THEN datediff(day, s1.sej_date_entree, s2.sej_date_sortie)
             WHEN s1.sej_date_entree < ven_admission THEN datediff(day, ven_admission, s2.sej_date_sortie)
         END AS nuit_1,
@@ -319,7 +315,7 @@ def execute_query(conn, start_date=None, end_date=None, venues=None):
         cr3.cr_libelle_long AS CR_courrier,
         dfs.fos_libelle AS Type_courrier,
         ds.dos_libelle_court AS Dos_Spe_ESL,
-        CASE 
+        CASE
             WHEN dfs.fos_libelle ='CR Lettre de Liaison Chirurgie Vasculaire Foch' THEN 'VASCULAIRE'
             WHEN dfs.fos_libelle ='CR Lettre de Liaison Chirurgie Urologique Foch' THEN 'UROLOGIE'
             WHEN dfs.fos_libelle ='CR Lettre de Liaison Réa Foch' THEN 'REANIMATION'
@@ -347,12 +343,12 @@ def execute_query(conn, start_date=None, end_date=None, venues=None):
             WHEN dfs.fos_libelle ='CR Lettre de Liaison NRDT Foch' THEN 'NEUROCHIRURGIE'
             WHEN dfs.fos_libelle ='CR Lettre de Liaison Neurochirurgie Foch' THEN 'NEUROCHIRURGIE'
             WHEN dfs.fos_libelle ='CR Urgences' THEN 'URGENCES'
-            ELSE cr4.cr_libelle_long 
+            ELSE cr4.cr_libelle_long
         END AS CR_Doss_spe,
         f.fic_date_creation,
         f.fic_date_modification,
         fhs2.date_min_val
-    FROM 
+    FROM
         NOYAU.patient.patient p
         LEFT JOIN DOMINHO.dominho.FICHE f ON p.pat_id = f.patient_id AND f.fic_venue IS NULL AND f.fic_suppr = 0
         INNER JOIN NOYAU.coeur.CENTRE_RESPONSABILITE cr3 ON cr3.cr_code = f.centre_responsabilite_code
@@ -362,48 +358,52 @@ def execute_query(conn, start_date=None, end_date=None, venues=None):
         LEFT JOIN noyau.coeur.CENTRE_RESPONSABILITE cr4 ON cr4.cr_code = crs.centre_responsabilite_code
         LEFT JOIN (
             SELECT fhs2.fiche_id, Min(fhs2.fic_date_statut_validation) AS date_min_val
-            FROM DOMINHO.dominho.FICHE_HISTORIQUE_STATUT fhs2 
+            FROM DOMINHO.dominho.FICHE_HISTORIQUE_STATUT fhs2
             WHERE fhs2.fic_statut_validation_id = 3
             GROUP BY fhs2.fiche_id
         ) AS fhs2 ON f.fiche_id = fhs2.fiche_id
         INNER JOIN DOMINHO.dominho.FORMULAIRE_SELECTION dfs ON f.formulaire_selection_id = dfs.formulaire_selection_id
             AND dfs.fos_libelle NOT LIKE '%HDJ%'
             AND dfs.fos_libelle NOT LIKE '%extraction%'
-        INNER JOIN dominho.dominho.FORMULAIRE fo ON dfs.formulaire_id = fo.formulaire_id 
+        INNER JOIN dominho.dominho.FORMULAIRE fo ON dfs.formulaire_id = fo.formulaire_id
             AND fo.type_document_code IN ('00209', '00082')
             AND for_courrier = 1
-        LEFT JOIN NOYAU.patient.VENUE v ON p.pat_id = v.pat_id AND v.pat_id = f.patient_id AND v.ven_supprime != 1 AND ven_type IN (1)
+        LEFT JOIN NOYAU.patient.VENUE v ON p.pat_id = v.pat_id AND v.pat_id = f.patient_id AND v.ven_supprime != 1
+        AND ven_type IN (1)
         LEFT JOIN NOYAU.patient.SEJOUR s1 ON s1.ven_id = v.ven_id AND v.ven_supprime != 1 AND s1.sej_numero = '1'
-        LEFT JOIN NOYAU.patient.SEJOUR s2 ON s2.ven_id = v.ven_id AND v.ven_supprime != 1 AND s2.sej_est_dernier_sejour = 1
+        LEFT JOIN NOYAU.patient.SEJOUR s2 ON s2.ven_id = v.ven_id AND v.ven_supprime != 1
+        AND s2.sej_est_dernier_sejour = 1
         LEFT JOIN (
             SELECT s.ven_id, MIN(s.sej_date_entree) AS date_der, s.sej_uf_medicale_code
             FROM NOYAU.patient.SEJOUR s
-            INNER JOIN noyau.patient.sejour s2 ON s.ven_id = s2.ven_id 
-                AND s.sej_uf_medicale_code = s2.sej_uf_medicale_code 
+            INNER JOIN noyau.patient.sejour s2 ON s.ven_id = s2.ven_id
+                AND s.sej_uf_medicale_code = s2.sej_uf_medicale_code
                 AND s2.sej_est_dernier_sejour = 1
             GROUP BY s.ven_id, s.sej_uf_medicale_code
         ) AS s3 ON s3.ven_id = s2.ven_id
         LEFT JOIN NOYAU.coeur.Uf uf ON uf.uf_code = s2.sej_uf_medicale_code
         INNER JOIN NOYAU.coeur.CENTRE_RESPONSABILITE cr ON uf.fk_cr_id = cr.cr_id
-    WHERE 
+    WHERE
         {date_condition}
         AND date_min_val >= DateAdd(Day, -1, Cast(s3.date_der AS date))
         AND date_min_val <= DateAdd(Day, 5, Cast(s2.sej_date_sortie AS date))
         AND date_min_val IS NOT NULL
         AND (
-            CASE 
+            CASE
                 WHEN s1.sej_date_entree >= ven_admission THEN datediff(day, s1.sej_date_entree, s2.sej_date_sortie)
                 WHEN s1.sej_date_entree < ven_admission THEN datediff(day, ven_admission, s2.sej_date_sortie)
             END
         ) >= 1
         AND (
-            cr.cr_libelle_long = cr3.cr_libelle_long 
+            cr.cr_libelle_long = cr3.cr_libelle_long
             OR Cr.cr_libelle_long = cr4.cr_libelle_long
             OR (cr.cr_libelle_long = 'NEUROCHIRURGIE' AND ds.dos_libelle_court = 'NRDT Foch')
             OR (cr.cr_libelle_long = 'ANESTHESIE' AND ds.dos_libelle_court = 'Obstétrique')
         )
-        AND ((fo.type_document_code IN ('00209')) OR (fo.type_document_code = '00082' AND s2.sej_uf_medicale_code IN ('290A', '294U')))
-        AND (format(p.pat_date_deces, 'yyyy/MM/dd') > format(s2.sej_date_sortie, 'yyyy/MM/dd') OR p.pat_date_deces IS NULL)
+        AND ((fo.type_document_code IN ('00209')) OR (fo.type_document_code = '00082'
+        AND s2.sej_uf_medicale_code IN ('290A', '294U')))
+        AND (format(p.pat_date_deces, 'yyyy/MM/dd') > format(s2.sej_date_sortie, 'yyyy/MM/dd')
+          OR p.pat_date_deces IS NULL)
     """
 
     # Requête SQL complète
@@ -428,7 +428,7 @@ def execute_query(conn, start_date=None, end_date=None, venues=None):
         raise HTTPException(
             status_code=500,
             detail=f"Erreur lors de l'exécution de la requête: {str(e)}",
-        )
+        ) from None
     finally:
         cursor.close()
 
@@ -436,12 +436,8 @@ def execute_query(conn, start_date=None, end_date=None, venues=None):
 # Route API pour récupérer les données des patients sans validation
 @app.get("/api/patients/raw")
 def get_patient_reports_raw(
-    start_date: str | None = Query(
-        None, description="Date de début (format YYYY-MM-DD)"
-    ),
-    end_date: str | None = Query(
-        None, description="Date de fin (format YYYY-MM-DD)"
-    ),
+    start_date: str | None = Query(None, description="Date de début (format YYYY-MM-DD)"),
+    end_date: str | None = Query(None, description="Date de fin (format YYYY-MM-DD)"),
 ):
     try:
         conn = get_db_connection()
@@ -449,21 +445,15 @@ def get_patient_reports_raw(
         conn.close()
         return results
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from None
 
 
 # Modification de la route API pour accepter les numéros de séjour
 @app.get("/api/patients/comptes-rendus", response_model=list[PatientRecord])
 def get_patient_reports(
-    start_date: str | None = Query(
-        None, description="Date de début (format YYYY-MM-DD)"
-    ),
-    end_date: str | None = Query(
-        None, description="Date de fin (format YYYY-MM-DD)"
-    ),
-    venues: str | None = Query(
-        None, description="Liste de numéros de séjour séparés par des virgules"
-    ),
+    start_date: str | None = Query(None, description="Date de début (format YYYY-MM-DD)"),
+    end_date: str | None = Query(None, description="Date de fin (format YYYY-MM-DD)"),
+    venues: str | None = Query(None, description="Liste de numéros de séjour séparés par des virgules"),
 ):
     try:
         # Validation des dates
@@ -523,18 +513,14 @@ def get_patient_reports(
 
         error_details = traceback.format_exc()
         print(f"Erreur: {error_details}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from None
 
 
 # Route pour les statistiques
 @app.get("/api/patients/stats")
 def get_patient_stats(
-    start_date: str | None = Query(
-        None, description="Date de début (format YYYY-MM-DD)"
-    ),
-    end_date: str | None = Query(
-        None, description="Date de fin (format YYYY-MM-DD)"
-    ),
+    start_date: str | None = Query(None, description="Date de début (format YYYY-MM-DD)"),
+    end_date: str | None = Query(None, description="Date de fin (format YYYY-MM-DD)"),
 ):
     try:
         # Obtenir une connexion à la base de données
@@ -553,39 +539,25 @@ def get_patient_stats(
         # Calculer les statistiques
         stats = {
             "total_comptes_rendus": len(df),
-            "comptes_rendus_par_mois": df.groupby("mois").size().to_dict()
-            if "mois" in df.columns
-            else {},
+            "comptes_rendus_par_mois": df.groupby("mois").size().to_dict() if "mois" in df.columns else {},
             "comptes_rendus_par_specialite": df.groupby("CR_Doss_spe").size().to_dict()
             if "CR_Doss_spe" in df.columns
             else {},
-            "delai_moyen_validation": df["LL_J0"].mean()
-            if "LL_J0" in df.columns
-            else 0,
-            "patients_uniques": df["pat_IPP"].nunique()
-            if "pat_IPP" in df.columns
-            else 0,
-            "distribution_nuits": df.groupby("nuit_1").size().to_dict()
-            if "nuit_1" in df.columns
-            else {},
+            "delai_moyen_validation": df["LL_J0"].mean() if "LL_J0" in df.columns else 0,
+            "patients_uniques": df["pat_IPP"].nunique() if "pat_IPP" in df.columns else 0,
+            "distribution_nuits": df.groupby("nuit_1").size().to_dict() if "nuit_1" in df.columns else {},
         }
 
         return stats
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Erreur lors du calcul des statistiques: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Erreur lors du calcul des statistiques: {str(e)}")
 
 
 # Route pour exporter les données au format CSV
 @app.get("/api/patients/export-csv")
 def export_csv(
-    start_date: str | None = Query(
-        None, description="Date de début (format YYYY-MM-DD)"
-    ),
-    end_date: str | None = Query(
-        None, description="Date de fin (format YYYY-MM-DD)"
-    ),
+    start_date: str | None = Query(None, description="Date de début (format YYYY-MM-DD)"),
+    end_date: str | None = Query(None, description="Date de fin (format YYYY-MM-DD)"),
 ):
     try:
         # Obtenir une connexion à la base de données
@@ -614,9 +586,7 @@ def export_csv(
         filepath = temp_dir / filename
 
         # Enregistrer en CSV
-        df.to_csv(
-            filepath, index=False, encoding="utf-8-sig"
-        )  # utf-8-sig pour support des accents dans Excel
+        df.to_csv(filepath, index=False, encoding="utf-8-sig")  # utf-8-sig pour support des accents dans Excel
 
         # Lire le fichier et le retourner comme réponse
         with open(filepath, "rb") as file:

@@ -10,9 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 # Charger les variables d'environnement
@@ -85,9 +83,7 @@ def get_oracle_connection():
         oracle_dsn = os.getenv("ORACLE_DSN")  # Format: host:port/service_name
 
         # Établir la connexion
-        connection = oracledb.connect(
-            user=oracle_user, password=oracle_password, dsn=oracle_dsn
-        )
+        connection = oracledb.connect(user=oracle_user, password=oracle_password, dsn=oracle_dsn)
 
         return connection
     except Exception as e:
@@ -111,9 +107,7 @@ def get_venue_numbers_from_easily(start_date: str, end_date: str):
 
         # Vérifier si la requête a réussi
         if response.status_code != 200:
-            logger.error(
-                f"Erreur lors de la requête à l'API Easily: {response.status_code}"
-            )
+            logger.error(f"Erreur lors de la requête à l'API Easily: {response.status_code}")
             raise HTTPException(
                 status_code=500,
                 detail=f"Erreur lors de la récupération des données depuis l'API Easily: {response.status_code}",
@@ -129,13 +123,9 @@ def get_venue_numbers_from_easily(start_date: str, end_date: str):
                 try:
                     venue_numbers.append(int(item["Num_Venue"]))  # Convert to integer
                 except (ValueError, TypeError):
-                    logger.warning(
-                        f"Skipping invalid venue number: {item['Num_Venue']}"
-                    )
+                    logger.warning(f"Skipping invalid venue number: {item['Num_Venue']}")
 
-        logger.info(
-            f"Récupération de {len(venue_numbers)} numéros de venue depuis l'API Easily"
-        )
+        logger.info(f"Récupération de {len(venue_numbers)} numéros de venue depuis l'API Easily")
         return venue_numbers
 
     except Exception as e:
@@ -147,9 +137,7 @@ def get_venue_numbers_from_easily(start_date: str, end_date: str):
 
 
 # Fonction pour exécuter la requête par lots
-def execute_query_in_batches(
-    conn, venues_list, start_date=None, end_date=None, batch_size=500
-):
+def execute_query_in_batches(conn, venues_list, start_date=None, end_date=None, batch_size=500):
     results = []
 
     # Traitement des venues par lots pour éviter la limite d'Oracle sur les paramètres
@@ -190,9 +178,7 @@ def execute_query_in_batches(
 
             cursor.close()
         except Exception as e:
-            logger.error(
-                f"Erreur lors de l'exécution du lot {i // batch_size + 1}: {str(e)}"
-            )
+            logger.error(f"Erreur lors de l'exécution du lot {i // batch_size + 1}: {str(e)}")
             raise e
 
     return results
@@ -205,12 +191,8 @@ def get_lifen_data(
         None,
         description="Liste des numéros de séjour séparés par des virgules (optionnel)",
     ),
-    start_date: str | None = Query(
-        None, description="Date de début (format YYYY-MM-DD)"
-    ),
-    end_date: str | None = Query(
-        None, description="Date de fin (format YYYY-MM-DD)"
-    ),
+    start_date: str | None = Query(None, description="Date de début (format YYYY-MM-DD)"),
+    end_date: str | None = Query(None, description="Date de fin (format YYYY-MM-DD)"),
 ):
     try:
         venues_list = []
@@ -228,9 +210,7 @@ def get_lifen_data(
         # Sinon, récupérer les numéros de venue depuis l'API Easily
         elif start_date and end_date:
             venues_list = get_venue_numbers_from_easily(start_date, end_date)
-            logger.info(
-                f"Récupération de {len(venues_list)} séjours depuis l'API Easily"
-            )
+            logger.info(f"Récupération de {len(venues_list)} séjours depuis l'API Easily")
         else:
             raise HTTPException(
                 status_code=400,
@@ -246,9 +226,7 @@ def get_lifen_data(
         conn = get_oracle_connection()
 
         # Exécuter la requête par lots
-        batch_results = execute_query_in_batches(
-            conn, venues_list, start_date, end_date
-        )
+        batch_results = execute_query_in_batches(conn, venues_list, start_date, end_date)
 
         # Fermer la connexion
         conn.close()
