@@ -55,6 +55,8 @@ class PatientRecord(BaseModel):
     fic_date_creation: datetime
     fic_date_modification: datetime | None = None
     date_min_val: datetime
+    date_diffusion: str = Field(alias="Date diffusion")
+    statut_envoi: str = Field(alias="Statut Envoi")
 
     class Config:
         populate_by_name = True
@@ -161,249 +163,274 @@ def execute_query(conn, start_date=None, end_date=None, venues=None):
 
     # Partie 1 de la requête (avec venue)
     sql_query_part1 = f"""
-    DECLARE @startOfCurrentMonth DATETIME
-    SET @startOfCurrentMonth = DATEADD(YEAR, DATEDIFF(year, 0, CURRENT_TIMESTAMP), 0)
+DECLARE @startOfCurrentMonth DATETIME
+SET @startOfCurrentMonth = DATEADD(YEAR, DATEDIFF(year, 0, CURRENT_TIMESTAMP), 0)
 
-    /*recherche fiche avec venue*/
-    SELECT DISTINCT
-        year(s2.sej_date_sortie) AS annee,
-        DateName(Month,s2.sej_date_sortie) AS mois,
-        datediff(day,s2.sej_date_sortie,date_min_val) AS LL_J0,
-        CASE
-            WHEN s1.sej_date_entree >= ven_admission THEN datediff(day,s1.sej_date_entree,s2.sej_date_sortie)
-            WHEN s1.sej_date_entree < ven_admission THEN datediff(day,ven_admission,s2.sej_date_sortie)
-        END AS nuit_1,
-        p.pat_ipp AS pat_IPP,
-        p.pat_date_deces,
-        v.ven_id,
-        f.fiche_id,
-        s1.sej_date_entree,
-        s1.sej_uf_medicale_code,
-        s3.date_der AS sej_date_der_entree,
-        s2.sej_date_sortie AS sej_date_sortie,
-        s2.sej_uf_medicale_code AS uf_der_pass,
-        cr.cr_libelle_long AS cr_der_sej,
-        CASE
-            WHEN f.fic_venue IS NULL THEN 0
-            WHEN f.fic_venue IS NOT NULL THEN v.ven_numero
-        END AS Num_Venue,
-        v.ven_numero AS ven_theo,
-        cr3.cr_libelle_long AS CR_courrier,
-        dfs.fos_libelle AS Type_courrier,
-        ds.dos_libelle_court AS Dos_Spe_ESL,
-        CASE 
-            WHEN dfs.fos_libelle ='CR Lettre de Liaison Chirurgie Vasculaire Foch' THEN 'VASCULAIRE'
-            WHEN dfs.fos_libelle ='CR Lettre de Liaison Chirurgie Urologique Foch' THEN 'UROLOGIE'
-            WHEN dfs.fos_libelle ='CR Lettre de Liaison Réa Foch' THEN 'REANIMATION'
-            WHEN dfs.fos_libelle ='CR Lettre de Liaison ORL Foch' THEN 'ORL'
-            WHEN dfs.fos_libelle ='CR Lettre de Liaison Oncologie Foch' THEN 'ONCOLOGIE'
-            WHEN dfs.fos_libelle ='CR HDJ Oncologie Foch' THEN 'ONCOLOGIE'
-            WHEN dfs.fos_libelle ='CR Lettre de Liaison Chirurgie Digestive Foch' THEN 'DIGESTIF'
-            WHEN dfs.fos_libelle ='CR HDJ Endoscopie Digestive Foch' THEN 'ENDODIG'
-            WHEN dfs.fos_libelle ='CR Lettre de Liaison Cardiologie Foch' THEN 'CARDIOLOGIE'
-            WHEN dfs.fos_libelle ='CR Lettre de Liaison Unité Vanderbilt Foch ' THEN 'VANDERBILDT'
-            WHEN dfs.fos_libelle ='CR Lettre de Liaison UPHU Foch ' THEN 'UPHU'
-            WHEN dfs.fos_libelle ='CR Lettre de Liaison Throm Foch' THEN 'NEUROLOGIE'
-            WHEN dfs.fos_libelle ='CR Lettre de Liaison Throm SG Foch' THEN 'NEUROLOGIE'
-            WHEN dfs.fos_libelle ='CR Lettre de Liaison Foch DOG' THEN 'OBSTETRIQUE'
-            WHEN dfs.fos_libelle ='CR Lettre de Liaison Pédiatrie Foch' THEN 'NEONATOLOGIE'
-            WHEN dfs.fos_libelle ='CR Lettre de Liaison Gynécologie Foch' THEN 'GYNECOLOGIE'
-            WHEN dfs.fos_libelle ='CR Lettre de Liaison Chirurgie Thoracique Foch' THEN 'THORACIQUE'
-            WHEN dfs.fos_libelle ='CR Lettre de Liaison Chirurgie Thoracique Foch' AND ds.dos_libelle_court = 'Chirurgie Thoracique Foch' THEN 'THORACIQUE'
-            WHEN dfs.fos_libelle ='CR Lettre de Liaison USIR Foch ' AND ds.dos_libelle_court = 'Chirurgie Thoracique Foch' THEN 'THORACIQUE'
-            WHEN dfs.fos_libelle ='CR Lettre de Liaison Gériatrie Foch' THEN 'GERIATRIE'
-            WHEN dfs.fos_libelle ='CR Lettre de Liaison M.P.R Foch' THEN 'MPR'
-            WHEN dfs.fos_libelle ='CR Lettre de Liaison SSPI Foch' THEN 'ANESTHESIE'
-            WHEN dfs.fos_libelle ='CR Lettre de Liaison Médecine interne et Polyvalente Foch' THEN 'MEDECINE INTERNE ET POLYVALENTE'
-            WHEN dfs.fos_libelle ='CR Lettre de Liaison Diabétologie Foch ' THEN 'MEDECINE INTERNE'
-            WHEN dfs.fos_libelle ='CR Lettre de Liaison NRDT Foch' THEN 'NEUROCHIRURGIE'
-            WHEN dfs.fos_libelle ='CR Lettre de Liaison Neurochirurgie Foch' THEN 'NEUROCHIRURGIE'
-            WHEN dfs.fos_libelle ='CR Urgences' THEN 'URGENCES'
-            ELSE cr4.cr_libelle_long
-        END AS CR_Doss_spe,
-        f.fic_date_creation,
-        f.fic_date_modification,
-        fhs2.date_min_val
-    FROM
-        /*jointure sur les venues*/
-        NOYAU.patient.VENUE v
-        LEFT JOIN NOYAU.patient.SEJOUR s1 ON s1.ven_id = v.ven_id 
-            AND v.ven_supprime != 1
-            AND s1.sej_numero = '1'
-            AND ven_type IN (1,8)
-        LEFT JOIN NOYAU.patient.SEJOUR s2 ON s2.ven_id = v.ven_id 
-            AND v.ven_supprime != 1
+/*recherche fiche avec venue*/
+SELECT DISTINCT
+    year(s2.sej_date_sortie) AS annee,
+    DateName(Month,s2.sej_date_sortie) AS mois,
+    datediff(day,s2.sej_date_sortie,date_min_val) AS LL_J0,
+    CASE
+        WHEN s1.sej_date_entree >= ven_admission THEN datediff(day,s1.sej_date_entree,s2.sej_date_sortie)
+        WHEN s1.sej_date_entree < ven_admission THEN datediff(day,ven_admission,s2.sej_date_sortie)
+    END AS nuit_1,
+    p.pat_ipp AS pat_IPP,
+    p.pat_date_deces,
+    v.ven_id,
+    f.fiche_id,
+    s1.sej_date_entree,
+    s1.sej_uf_medicale_code,
+    s3.date_der AS sej_date_der_entree,
+    s2.sej_date_sortie AS sej_date_sortie,
+    s2.sej_uf_medicale_code AS uf_der_pass,
+    cr.cr_libelle_long AS cr_der_sej,
+    CASE
+        WHEN f.fic_venue IS NULL THEN 0
+        WHEN f.fic_venue IS NOT NULL THEN v.ven_numero
+    END AS Num_Venue,
+    v.ven_numero AS ven_theo,
+    cr3.cr_libelle_long AS CR_courrier,
+    dfs.fos_libelle AS Type_courrier,
+    ds.dos_libelle_court AS Dos_Spe_ESL,
+    CASE 
+        WHEN dfs.fos_libelle ='CR Lettre de Liaison Chirurgie Vasculaire Foch' THEN 'VASCULAIRE'
+        WHEN dfs.fos_libelle ='CR Lettre de Liaison Chirurgie Urologique Foch' THEN 'UROLOGIE'
+        WHEN dfs.fos_libelle ='CR Lettre de Liaison Réa Foch' THEN 'REANIMATION'
+        WHEN dfs.fos_libelle ='CR Lettre de Liaison ORL Foch' THEN 'ORL'
+        WHEN dfs.fos_libelle ='CR Lettre de Liaison Oncologie Foch' THEN 'ONCOLOGIE'
+        WHEN dfs.fos_libelle ='CR HDJ Oncologie Foch' THEN 'ONCOLOGIE'
+        WHEN dfs.fos_libelle ='CR Lettre de Liaison Chirurgie Digestive Foch' THEN 'DIGESTIF'
+        WHEN dfs.fos_libelle ='CR HDJ Endoscopie Digestive Foch' THEN 'ENDODIG'
+        WHEN dfs.fos_libelle ='CR Lettre de Liaison Cardiologie Foch' THEN 'CARDIOLOGIE'
+        WHEN dfs.fos_libelle ='CR Lettre de Liaison Unité Vanderbilt Foch ' THEN 'VANDERBILDT'
+        WHEN dfs.fos_libelle ='CR Lettre de Liaison UPHU Foch ' THEN 'UPHU'
+        WHEN dfs.fos_libelle ='CR Lettre de Liaison Throm Foch' THEN 'NEUROLOGIE'
+        WHEN dfs.fos_libelle ='CR Lettre de Liaison Throm SG Foch' THEN 'NEUROLOGIE'
+        WHEN dfs.fos_libelle ='CR Lettre de Liaison Foch DOG' THEN 'OBSTETRIQUE'
+        WHEN dfs.fos_libelle ='CR Lettre de Liaison Pédiatrie Foch' THEN 'NEONATOLOGIE'
+        WHEN dfs.fos_libelle ='CR Lettre de Liaison Gynécologie Foch' THEN 'GYNECOLOGIE'
+        WHEN dfs.fos_libelle ='CR Lettre de Liaison Chirurgie Thoracique Foch' THEN 'THORACIQUE'
+        WHEN dfs.fos_libelle ='CR Lettre de Liaison Chirurgie Thoracique Foch' AND ds.dos_libelle_court = 'Chirurgie Thoracique Foch' THEN 'THORACIQUE'
+        WHEN dfs.fos_libelle ='CR Lettre de Liaison USIR Foch ' AND ds.dos_libelle_court = 'Chirurgie Thoracique Foch' THEN 'THORACIQUE'
+        WHEN dfs.fos_libelle ='CR Lettre de Liaison Gériatrie Foch' THEN 'GERIATRIE'
+        WHEN dfs.fos_libelle ='CR Lettre de Liaison M.P.R Foch' THEN 'MPR'
+        WHEN dfs.fos_libelle ='CR Lettre de Liaison SSPI Foch' THEN 'ANESTHESIE'
+        WHEN dfs.fos_libelle ='CR Lettre de Liaison Médecine interne et Polyvalente Foch' THEN 'MEDECINE INTERNE ET POLYVALENTE'
+        WHEN dfs.fos_libelle ='CR Lettre de Liaison Diabétologie Foch ' THEN 'MEDECINE INTERNE'
+        WHEN dfs.fos_libelle ='CR Lettre de Liaison NRDT Foch' THEN 'NEUROCHIRURGIE'
+        WHEN dfs.fos_libelle ='CR Lettre de Liaison Neurochirurgie Foch' THEN 'NEUROCHIRURGIE'
+        WHEN dfs.fos_libelle ='CR Urgences' THEN 'URGENCES'
+        ELSE cr4.cr_libelle_long
+    END AS CR_Doss_spe,
+    f.fic_date_creation,
+    f.fic_date_modification,
+    fhs2.date_min_val,
+    convert(Varchar, EDES.dest_diffusion_date, 103) as 'Date diffusion',
+    CASE EDES.st_id
+        WHEN 1 THEN 'A diffuser'
+        WHEN 3 THEN 'Echec'
+        WHEN 4 THEN 'Diffuse'
+        WHEN 7 THEN 'Annule'
+        ELSE 'Pas dans boite envoi'
+    END as 'Statut Envoi'
+FROM
+    /*jointure sur les venues*/
+    NOYAU.patient.VENUE v
+    LEFT JOIN NOYAU.patient.SEJOUR s1 ON s1.ven_id = v.ven_id 
+        AND v.ven_supprime != 1
+        AND s1.sej_numero = '1'
+        AND ven_type IN (1,8)
+    LEFT JOIN NOYAU.patient.SEJOUR s2 ON s2.ven_id = v.ven_id 
+        AND v.ven_supprime != 1
+        AND s2.sej_est_dernier_sejour = 1
+    LEFT JOIN (
+        SELECT s.ven_id, MIN(s.sej_date_entree) AS date_der, s.sej_uf_medicale_code
+        FROM NOYAU.patient.SEJOUR s
+        INNER JOIN noyau.patient.sejour s2 ON s.sej_uf_medicale_code = s2.sej_uf_medicale_code 
+            AND s.ven_id = s2.ven_id 
             AND s2.sej_est_dernier_sejour = 1
-        LEFT JOIN (
-            SELECT s.ven_id, MIN(s.sej_date_entree) AS date_der, s.sej_uf_medicale_code
-            FROM NOYAU.patient.SEJOUR s
-            INNER JOIN noyau.patient.sejour s2 ON s.sej_uf_medicale_code = s2.sej_uf_medicale_code 
-                AND s.ven_id = s2.ven_id 
-                AND s2.sej_est_dernier_sejour = 1
-            WHERE s2.sej_est_dernier_sejour = 1 AND s.ven_id = s2.ven_id
-            GROUP BY s.ven_id, s.sej_uf_medicale_code
-        ) AS s3 ON s3.ven_id = s2.ven_id AND s3.sej_uf_medicale_code = s2.sej_uf_medicale_code
-        LEFT JOIN NOYAU.coeur.Uf uf ON s2.sej_uf_medicale_code = uf.uf_code
-        INNER JOIN NOYAU.coeur.CENTRE_RESPONSABILITE cr ON cr.cr_id = uf.fk_cr_id
-        LEFT JOIN DOMINHO.dominho.FICHE f ON f.fic_venue = s2.ven_id AND f.fic_suppr = 0
-        LEFT JOIN NOYAU.coeur.CENTRE_RESPONSABILITE cr3 ON cr3.cr_code = f.centre_responsabilite_code
-        LEFT JOIN dominho.dominho.DOSSIER_SPECIALITE ds ON ds.dossier_specialite_id = f.dossier_specialite_id
-        INNER JOIN NOYAU.patient.patient p ON p.pat_id = f.patient_id
-        LEFT JOIN (
-            SELECT fhs2.fiche_id, Min(fhs2.fic_date_statut_validation) AS date_min_val
-            FROM DOMINHO.dominho.FICHE_HISTORIQUE_STATUT fhs2 
-            WHERE fhs2.fic_statut_validation_id = 3
-            GROUP BY fhs2.fiche_id
-        ) AS fhs2 ON f.fiche_id = fhs2.fiche_id
-        INNER JOIN DOMINHO.dominho.FORMULAIRE_SELECTION dfs ON f.formulaire_selection_id = dfs.formulaire_selection_id
-            AND dfs.fos_libelle NOT LIKE '%HDJ%'
-            AND dfs.fos_libelle NOT LIKE '%extraction%'
-        LEFT JOIN dominho.dominho.FORMULAIRE fo ON dfs.formulaire_id = fo.formulaire_id 
-            AND (fo.type_document_code = '00209' OR fo.type_document_code = '00082')
-            AND for_courrier = 1
-        LEFT JOIN [dominho].[dominho].[DOSSIER_SPECIALITE_SPECIALITE] dss ON dss.dossier_specialite_id = ds.dossier_specialite_id
-        LEFT JOIN [dominho].[dominho].[CENTRE_RESPONSABILITE_SPECIALITE] crs ON crs.specialite_code = dss.specialite_code
-        LEFT JOIN noyau.coeur.CENTRE_RESPONSABILITE cr4 ON cr4.cr_code = crs.centre_responsabilite_code
-    WHERE 
-        {venue_condition if venue_condition else date_condition}
-        AND date_min_val >= dateAdd(Day, -1, cast(s3.date_der AS date))
-        AND date_min_val <= DateAdd(Day, 5, Cast(s2.sej_date_sortie AS date))
-        AND (
-            CASE 
-                WHEN s1.sej_date_entree >= ven_admission THEN datediff(day, s1.sej_date_entree, s2.sej_date_sortie)
-                WHEN s1.sej_date_entree < ven_admission THEN datediff(day, ven_admission, s2.sej_date_sortie)
-            END
-        ) >= 1
-        AND (
-            cr.cr_libelle_long = cr3.cr_libelle_long 
-            OR Cr.cr_libelle_long = cr4.cr_libelle_long
-            OR (cr.cr_libelle_long = 'NEUROCHIRURGIE' AND ds.dos_libelle_court = 'NRDT Foch')
-            OR (cr.cr_libelle_long = 'ANESTHESIE' AND ds.dos_libelle_court = 'Obstétrique')
-        )
-        AND ((fo.type_document_code IN ('00209')) OR (fo.type_document_code = '00082' AND s2.sej_uf_medicale_code IN ('290A', '294U')))
-        AND (format(p.pat_date_deces, 'yyyy/MM/dd') > format(s2.sej_date_sortie, 'yyyy/MM/dd') OR p.pat_date_deces IS NULL)
+        WHERE s2.sej_est_dernier_sejour = 1 AND s.ven_id = s2.ven_id
+        GROUP BY s.ven_id, s.sej_uf_medicale_code
+    ) AS s3 ON s3.ven_id = s2.ven_id AND s3.sej_uf_medicale_code = s2.sej_uf_medicale_code
+    LEFT JOIN NOYAU.coeur.Uf uf ON s2.sej_uf_medicale_code = uf.uf_code
+    INNER JOIN NOYAU.coeur.CENTRE_RESPONSABILITE cr ON cr.cr_id = uf.fk_cr_id
+    LEFT JOIN DOMINHO.dominho.FICHE f ON f.fic_venue = s2.ven_id AND f.fic_suppr = 0
+    LEFT JOIN NOYAU.coeur.CENTRE_RESPONSABILITE cr3 ON cr3.cr_code = f.centre_responsabilite_code
+    LEFT JOIN dominho.dominho.DOSSIER_SPECIALITE ds ON ds.dossier_specialite_id = f.dossier_specialite_id
+    INNER JOIN NOYAU.patient.patient p ON p.pat_id = f.patient_id
+    LEFT JOIN (
+        SELECT fhs2.fiche_id, Min(fhs2.fic_date_statut_validation) AS date_min_val
+        FROM DOMINHO.dominho.FICHE_HISTORIQUE_STATUT fhs2 
+        WHERE fhs2.fic_statut_validation_id = 3
+        GROUP BY fhs2.fiche_id
+    ) AS fhs2 ON f.fiche_id = fhs2.fiche_id
+    INNER JOIN DOMINHO.dominho.FORMULAIRE_SELECTION dfs ON f.formulaire_selection_id = dfs.formulaire_selection_id
+        AND dfs.fos_libelle NOT LIKE '%HDJ%'
+        AND dfs.fos_libelle NOT LIKE '%extraction%'
+    LEFT JOIN dominho.dominho.FORMULAIRE fo ON dfs.formulaire_id = fo.formulaire_id 
+        AND (fo.type_document_code = '00209' OR fo.type_document_code = '00082')
+        AND for_courrier = 1
+    LEFT JOIN [dominho].[dominho].[DOSSIER_SPECIALITE_SPECIALITE] dss ON dss.dossier_specialite_id = ds.dossier_specialite_id
+    LEFT JOIN [dominho].[dominho].[CENTRE_RESPONSABILITE_SPECIALITE] crs ON crs.specialite_code = dss.specialite_code
+    LEFT JOIN noyau.coeur.CENTRE_RESPONSABILITE cr4 ON cr4.cr_code = crs.centre_responsabilite_code
+    
+    /* Ajout des jointures pour la date de diffusion et statut envoi */
+    LEFT JOIN BOITE_ENVOI.BOITE_ENVOI.DOCUMENT EDOC ON EDOC.document_id = f.document_id
+    LEFT JOIN BOITE_ENVOI.BOITE_ENVOI.DESTINATAIRE EDES ON EDES.doc_id = EDOC.doc_id
+WHERE 
+    {venue_condition if venue_condition else date_condition}
+    AND date_min_val >= dateAdd(Day, -1, cast(s3.date_der AS date))
+    AND date_min_val <= DateAdd(Day, 5, Cast(s2.sej_date_sortie AS date))
+    AND (
+        CASE 
+            WHEN s1.sej_date_entree >= ven_admission THEN datediff(day, s1.sej_date_entree, s2.sej_date_sortie)
+            WHEN s1.sej_date_entree < ven_admission THEN datediff(day, ven_admission, s2.sej_date_sortie)
+        END
+    ) >= 1
+    AND (
+        cr.cr_libelle_long = cr3.cr_libelle_long 
+        OR Cr.cr_libelle_long = cr4.cr_libelle_long
+        OR (cr.cr_libelle_long = 'NEUROCHIRURGIE' AND ds.dos_libelle_court = 'NRDT Foch')
+        OR (cr.cr_libelle_long = 'ANESTHESIE' AND ds.dos_libelle_court = 'Obstétrique')
+    )
+    AND ((fo.type_document_code IN ('00209')) OR (fo.type_document_code = '00082' AND s2.sej_uf_medicale_code IN ('290A', '294U')))
+    AND (format(p.pat_date_deces, 'yyyy/MM/dd') > format(s2.sej_date_sortie, 'yyyy/MM/dd') OR p.pat_date_deces IS NULL)
+
     """
 
     # Partie 2 de la requête (sans venue) - seulement si nous n'utilisons pas de filtrage par venue
     sql_query_part2 = f"""
-    UNION
 
-    /*Sans venue*/
-    SELECT DISTINCT
-        year(s2.sej_date_sortie) AS annee,
-        DateName(Month, s2.sej_date_sortie) AS mois,
-        datediff(day, s2.sej_date_sortie, date_min_val) AS LL_J0,
+UNION
+
+/*Sans venue*/
+SELECT DISTINCT
+    year(s2.sej_date_sortie) AS annee,
+    DateName(Month, s2.sej_date_sortie) AS mois,
+    datediff(day, s2.sej_date_sortie, date_min_val) AS LL_J0,
+    CASE
+        WHEN s1.sej_date_entree >= ven_admission THEN datediff(day, s1.sej_date_entree, s2.sej_date_sortie)
+        WHEN s1.sej_date_entree < ven_admission THEN datediff(day, ven_admission, s2.sej_date_sortie)
+    END AS nuit_1,
+    p.pat_ipp AS pat_IPP,
+    p.pat_date_deces,
+    v.ven_id,
+    f.fiche_id,
+    s1.sej_date_entree,
+    s1.sej_uf_medicale_code,
+    s3.date_der AS sej_date_der_entree,
+    s2.sej_date_sortie AS sej_date_sortie,
+    s2.sej_uf_medicale_code AS uf_der_pass,
+    cr.cr_libelle_court AS cr_der_sej,
+    CASE
+        WHEN f.fic_venue IS NULL THEN 0
+        WHEN f.fic_venue IS NOT NULL THEN v.ven_numero
+    END AS Num_Venue,
+    v.ven_numero AS ven_theo,
+    cr3.cr_libelle_long AS CR_courrier,
+    dfs.fos_libelle AS Type_courrier,
+    ds.dos_libelle_court AS Dos_Spe_ESL,
+    CASE
+        WHEN dfs.fos_libelle ='CR Lettre de Liaison Chirurgie Vasculaire Foch' THEN 'VASCULAIRE'
+        WHEN dfs.fos_libelle ='CR Lettre de Liaison Chirurgie Urologique Foch' THEN 'UROLOGIE'
+        WHEN dfs.fos_libelle ='CR Lettre de Liaison Réa Foch' THEN 'REANIMATION'
+        WHEN dfs.fos_libelle ='CR Lettre de Liaison ORL Foch' THEN 'ORL'
+        WHEN dfs.fos_libelle ='CR Lettre de Liaison Oncologie Foch' THEN 'ONCOLOGIE'
+        WHEN dfs.fos_libelle ='CR HDJ Oncologie Foch' THEN 'ONCOLOGIE'
+        WHEN dfs.fos_libelle ='CR Lettre de Liaison Chirurgie Digestive Foch' THEN 'DIGESTIF'
+        WHEN dfs.fos_libelle ='CR HDJ Endoscopie Digestive Foch' THEN 'ENDODIG'
+        WHEN dfs.fos_libelle ='CR Lettre de Liaison Cardiologie Foch' THEN 'CARDIOLOGIE'
+        WHEN dfs.fos_libelle ='CR Lettre de Liaison Unité Vanderbilt Foch ' THEN 'VANDERBILDT'
+        WHEN dfs.fos_libelle ='CR Lettre de Liaison UPHU Foch ' THEN 'UPHU'
+        WHEN dfs.fos_libelle ='CR Lettre de Liaison Throm Foch' THEN 'NEUROLOGIE'
+        WHEN dfs.fos_libelle ='CR Lettre de Liaison Throm SG Foch' THEN 'NEUROLOGIE'
+        WHEN dfs.fos_libelle ='CR Lettre de Liaison Foch DOG' THEN 'OBSTETRIQUE'
+        WHEN dfs.fos_libelle ='CR Lettre de Liaison Pédiatrie Foch' THEN 'NEONATOLOGIE'
+        WHEN dfs.fos_libelle ='CR Lettre de Liaison Gynécologie Foch' THEN 'GYNECOLOGIE'
+        WHEN dfs.fos_libelle ='CR Lettre de Liaison Chirurgie Thoracique Foch' THEN 'THORACIQUE'
+        WHEN dfs.fos_libelle ='CR Lettre de Liaison Chirurgie Thoracique Foch' AND ds.dos_libelle_court = 'Chirurgie Thoracique Foch' THEN 'THORACIQUE'
+        WHEN dfs.fos_libelle ='CR Lettre de Liaison USIR Foch ' AND ds.dos_libelle_court = 'Chirurgie Thoracique Foch' THEN 'THORACIQUE'
+        WHEN dfs.fos_libelle ='CR Lettre de Liaison Gériatrie Foch' THEN 'GERIATRIE'
+        WHEN dfs.fos_libelle ='CR Lettre de Liaison M.P.R Foch' THEN 'MPR'
+        WHEN dfs.fos_libelle ='CR Lettre de Liaison SSPI Foch' THEN 'ANESTHESIE'
+        WHEN dfs.fos_libelle ='CR Lettre de Liaison Médecine interne et Polyvalente Foch'THEN 'MEDECINE INTERNE ET POLYVALENTE'
+        WHEN dfs.fos_libelle ='CR Lettre de Liaison Diabétologie Foch ' THEN 'MEDECINE INTERNE'
+        WHEN dfs.fos_libelle ='CR Lettre de Liaison NRDT Foch' THEN 'NEUROCHIRURGIE'
+        WHEN dfs.fos_libelle ='CR Lettre de Liaison Neurochirurgie Foch' THEN 'NEUROCHIRURGIE'
+        WHEN dfs.fos_libelle ='CR Urgences' THEN 'URGENCES'
+        ELSE cr4.cr_libelle_long
+    END AS CR_Doss_spe,
+    f.fic_date_creation,
+    f.fic_date_modification,
+    fhs2.date_min_val,
+    convert(Varchar, EDES.dest_diffusion_date, 103) as 'Date diffusion',
+    CASE EDES.st_id
+        WHEN 1 THEN 'A diffuser'
+        WHEN 3 THEN 'Echec'
+        WHEN 4 THEN 'Diffuse'
+        WHEN 7 THEN 'Annule'
+        ELSE 'Pas dans boite envoi'
+    END as 'Statut Envoi'
+FROM
+    NOYAU.patient.patient p
+    LEFT JOIN DOMINHO.dominho.FICHE f ON p.pat_id = f.patient_id AND f.fic_venue IS NULL AND f.fic_suppr = 0
+    INNER JOIN NOYAU.coeur.CENTRE_RESPONSABILITE cr3 ON cr3.cr_code = f.centre_responsabilite_code
+    LEFT JOIN dominho.dominho.DOSSIER_SPECIALITE ds ON ds.dossier_specialite_id = f.dossier_specialite_id
+    LEFT JOIN [dominho].[dominho].[DOSSIER_SPECIALITE_SPECIALITE] dss ON dss.dossier_specialite_id = ds.dossier_specialite_id
+    LEFT JOIN [dominho].[dominho].[CENTRE_RESPONSABILITE_SPECIALITE] crs ON crs.specialite_code = dss.specialite_code
+    LEFT JOIN noyau.coeur.CENTRE_RESPONSABILITE cr4 ON cr4.cr_code = crs.centre_responsabilite_code
+    LEFT JOIN (
+        SELECT fhs2.fiche_id, Min(fhs2.fic_date_statut_validation) AS date_min_val
+        FROM DOMINHO.dominho.FICHE_HISTORIQUE_STATUT fhs2
+        WHERE fhs2.fic_statut_validation_id = 3
+        GROUP BY fhs2.fiche_id
+    ) AS fhs2 ON f.fiche_id = fhs2.fiche_id
+    INNER JOIN DOMINHO.dominho.FORMULAIRE_SELECTION dfs ON f.formulaire_selection_id = dfs.formulaire_selection_id
+        AND dfs.fos_libelle NOT LIKE '%HDJ%'
+        AND dfs.fos_libelle NOT LIKE '%extraction%'
+    INNER JOIN dominho.dominho.FORMULAIRE fo ON dfs.formulaire_id = fo.formulaire_id
+        AND fo.type_document_code IN ('00209', '00082')
+        AND for_courrier = 1
+    LEFT JOIN NOYAU.patient.VENUE v ON p.pat_id = v.pat_id AND v.pat_id = f.patient_id AND v.ven_supprime != 1
+    AND ven_type IN (1)
+    LEFT JOIN NOYAU.patient.SEJOUR s1 ON s1.ven_id = v.ven_id AND v.ven_supprime != 1 AND s1.sej_numero = '1'
+    LEFT JOIN NOYAU.patient.SEJOUR s2 ON s2.ven_id = v.ven_id AND v.ven_supprime != 1
+    AND s2.sej_est_dernier_sejour = 1
+    LEFT JOIN (
+        SELECT s.ven_id, MIN(s.sej_date_entree) AS date_der, s.sej_uf_medicale_code
+        FROM NOYAU.patient.SEJOUR s
+        INNER JOIN noyau.patient.sejour s2 ON s.ven_id = s2.ven_id
+            AND s.sej_uf_medicale_code = s2.sej_uf_medicale_code
+            AND s2.sej_est_dernier_sejour = 1
+        GROUP BY s.ven_id, s.sej_uf_medicale_code
+    ) AS s3 ON s3.ven_id = s2.ven_id
+    LEFT JOIN NOYAU.coeur.Uf uf ON uf.uf_code = s2.sej_uf_medicale_code
+    INNER JOIN NOYAU.coeur.CENTRE_RESPONSABILITE cr ON uf.fk_cr_id = cr.cr_id
+    /* Ajout des jointures pour la date de diffusion et statut envoi */
+    LEFT JOIN BOITE_ENVOI.BOITE_ENVOI.DOCUMENT EDOC ON EDOC.document_id = f.document_id
+    LEFT JOIN BOITE_ENVOI.BOITE_ENVOI.DESTINATAIRE EDES ON EDES.doc_id = EDOC.doc_id
+WHERE
+    {date_condition}
+    AND date_min_val >= DateAdd(Day, -1, Cast(s3.date_der AS date))
+    AND date_min_val <= DateAdd(Day, 5, Cast(s2.sej_date_sortie AS date))
+    AND date_min_val IS NOT NULL
+    AND (
         CASE
             WHEN s1.sej_date_entree >= ven_admission THEN datediff(day, s1.sej_date_entree, s2.sej_date_sortie)
             WHEN s1.sej_date_entree < ven_admission THEN datediff(day, ven_admission, s2.sej_date_sortie)
-        END AS nuit_1,
-        p.pat_ipp AS pat_IPP,
-        p.pat_date_deces,
-        v.ven_id,
-        f.fiche_id,
-        s1.sej_date_entree,
-        s1.sej_uf_medicale_code,
-        s3.date_der AS sej_date_der_entree,
-        s2.sej_date_sortie AS sej_date_sortie,
-        s2.sej_uf_medicale_code AS uf_der_pass,
-        cr.cr_libelle_court AS cr_der_sej,
-        CASE
-            WHEN f.fic_venue IS NULL THEN 0
-            WHEN f.fic_venue IS NOT NULL THEN v.ven_numero
-        END AS Num_Venue,
-        v.ven_numero AS ven_theo,
-        cr3.cr_libelle_long AS CR_courrier,
-        dfs.fos_libelle AS Type_courrier,
-        ds.dos_libelle_court AS Dos_Spe_ESL,
-        CASE
-            WHEN dfs.fos_libelle ='CR Lettre de Liaison Chirurgie Vasculaire Foch' THEN 'VASCULAIRE'
-            WHEN dfs.fos_libelle ='CR Lettre de Liaison Chirurgie Urologique Foch' THEN 'UROLOGIE'
-            WHEN dfs.fos_libelle ='CR Lettre de Liaison Réa Foch' THEN 'REANIMATION'
-            WHEN dfs.fos_libelle ='CR Lettre de Liaison ORL Foch' THEN 'ORL'
-            WHEN dfs.fos_libelle ='CR Lettre de Liaison Oncologie Foch' THEN 'ONCOLOGIE'
-            WHEN dfs.fos_libelle ='CR HDJ Oncologie Foch' THEN 'ONCOLOGIE'
-            WHEN dfs.fos_libelle ='CR Lettre de Liaison Chirurgie Digestive Foch' THEN 'DIGESTIF'
-            WHEN dfs.fos_libelle ='CR HDJ Endoscopie Digestive Foch' THEN 'ENDODIG'
-            WHEN dfs.fos_libelle ='CR Lettre de Liaison Cardiologie Foch' THEN 'CARDIOLOGIE'
-            WHEN dfs.fos_libelle ='CR Lettre de Liaison Unité Vanderbilt Foch ' THEN 'VANDERBILDT'
-            WHEN dfs.fos_libelle ='CR Lettre de Liaison UPHU Foch ' THEN 'UPHU'
-            WHEN dfs.fos_libelle ='CR Lettre de Liaison Throm Foch' THEN 'NEUROLOGIE'
-            WHEN dfs.fos_libelle ='CR Lettre de Liaison Throm SG Foch' THEN 'NEUROLOGIE'
-            WHEN dfs.fos_libelle ='CR Lettre de Liaison Foch DOG' THEN 'OBSTETRIQUE'
-            WHEN dfs.fos_libelle ='CR Lettre de Liaison Pédiatrie Foch' THEN 'NEONATOLOGIE'
-            WHEN dfs.fos_libelle ='CR Lettre de Liaison Gynécologie Foch' THEN 'GYNECOLOGIE'
-            WHEN dfs.fos_libelle ='CR Lettre de Liaison Chirurgie Thoracique Foch' THEN 'THORACIQUE'
-            WHEN dfs.fos_libelle ='CR Lettre de Liaison Chirurgie Thoracique Foch' AND ds.dos_libelle_court = 'Chirurgie Thoracique Foch' THEN 'THORACIQUE'
-            WHEN dfs.fos_libelle ='CR Lettre de Liaison USIR Foch ' AND ds.dos_libelle_court = 'Chirurgie Thoracique Foch' THEN 'THORACIQUE'
-            WHEN dfs.fos_libelle ='CR Lettre de Liaison Gériatrie Foch' THEN 'GERIATRIE'
-            WHEN dfs.fos_libelle ='CR Lettre de Liaison M.P.R Foch' THEN 'MPR'
-            WHEN dfs.fos_libelle ='CR Lettre de Liaison SSPI Foch' THEN 'ANESTHESIE'
-            WHEN dfs.fos_libelle ='CR Lettre de Liaison Médecine interne et Polyvalente Foch'THEN 'MEDECINE INTERNE ET POLYVALENTE'
-            WHEN dfs.fos_libelle ='CR Lettre de Liaison Diabétologie Foch ' THEN 'MEDECINE INTERNE'
-            WHEN dfs.fos_libelle ='CR Lettre de Liaison NRDT Foch' THEN 'NEUROCHIRURGIE'
-            WHEN dfs.fos_libelle ='CR Lettre de Liaison Neurochirurgie Foch' THEN 'NEUROCHIRURGIE'
-            WHEN dfs.fos_libelle ='CR Urgences' THEN 'URGENCES'
-            ELSE cr4.cr_libelle_long
-        END AS CR_Doss_spe,
-        f.fic_date_creation,
-        f.fic_date_modification,
-        fhs2.date_min_val
-    FROM
-        NOYAU.patient.patient p
-        LEFT JOIN DOMINHO.dominho.FICHE f ON p.pat_id = f.patient_id AND f.fic_venue IS NULL AND f.fic_suppr = 0
-        INNER JOIN NOYAU.coeur.CENTRE_RESPONSABILITE cr3 ON cr3.cr_code = f.centre_responsabilite_code
-        LEFT JOIN dominho.dominho.DOSSIER_SPECIALITE ds ON ds.dossier_specialite_id = f.dossier_specialite_id
-        LEFT JOIN [dominho].[dominho].[DOSSIER_SPECIALITE_SPECIALITE] dss ON dss.dossier_specialite_id = ds.dossier_specialite_id
-        LEFT JOIN [dominho].[dominho].[CENTRE_RESPONSABILITE_SPECIALITE] crs ON crs.specialite_code = dss.specialite_code
-        LEFT JOIN noyau.coeur.CENTRE_RESPONSABILITE cr4 ON cr4.cr_code = crs.centre_responsabilite_code
-        LEFT JOIN (
-            SELECT fhs2.fiche_id, Min(fhs2.fic_date_statut_validation) AS date_min_val
-            FROM DOMINHO.dominho.FICHE_HISTORIQUE_STATUT fhs2
-            WHERE fhs2.fic_statut_validation_id = 3
-            GROUP BY fhs2.fiche_id
-        ) AS fhs2 ON f.fiche_id = fhs2.fiche_id
-        INNER JOIN DOMINHO.dominho.FORMULAIRE_SELECTION dfs ON f.formulaire_selection_id = dfs.formulaire_selection_id
-            AND dfs.fos_libelle NOT LIKE '%HDJ%'
-            AND dfs.fos_libelle NOT LIKE '%extraction%'
-        INNER JOIN dominho.dominho.FORMULAIRE fo ON dfs.formulaire_id = fo.formulaire_id
-            AND fo.type_document_code IN ('00209', '00082')
-            AND for_courrier = 1
-        LEFT JOIN NOYAU.patient.VENUE v ON p.pat_id = v.pat_id AND v.pat_id = f.patient_id AND v.ven_supprime != 1
-        AND ven_type IN (1)
-        LEFT JOIN NOYAU.patient.SEJOUR s1 ON s1.ven_id = v.ven_id AND v.ven_supprime != 1 AND s1.sej_numero = '1'
-        LEFT JOIN NOYAU.patient.SEJOUR s2 ON s2.ven_id = v.ven_id AND v.ven_supprime != 1
-        AND s2.sej_est_dernier_sejour = 1
-        LEFT JOIN (
-            SELECT s.ven_id, MIN(s.sej_date_entree) AS date_der, s.sej_uf_medicale_code
-            FROM NOYAU.patient.SEJOUR s
-            INNER JOIN noyau.patient.sejour s2 ON s.ven_id = s2.ven_id
-                AND s.sej_uf_medicale_code = s2.sej_uf_medicale_code
-                AND s2.sej_est_dernier_sejour = 1
-            GROUP BY s.ven_id, s.sej_uf_medicale_code
-        ) AS s3 ON s3.ven_id = s2.ven_id
-        LEFT JOIN NOYAU.coeur.Uf uf ON uf.uf_code = s2.sej_uf_medicale_code
-        INNER JOIN NOYAU.coeur.CENTRE_RESPONSABILITE cr ON uf.fk_cr_id = cr.cr_id
-    WHERE
-        {date_condition}
-        AND date_min_val >= DateAdd(Day, -1, Cast(s3.date_der AS date))
-        AND date_min_val <= DateAdd(Day, 5, Cast(s2.sej_date_sortie AS date))
-        AND date_min_val IS NOT NULL
-        AND (
-            CASE
-                WHEN s1.sej_date_entree >= ven_admission THEN datediff(day, s1.sej_date_entree, s2.sej_date_sortie)
-                WHEN s1.sej_date_entree < ven_admission THEN datediff(day, ven_admission, s2.sej_date_sortie)
-            END
-        ) >= 1
-        AND (
-            cr.cr_libelle_long = cr3.cr_libelle_long
-            OR Cr.cr_libelle_long = cr4.cr_libelle_long
-            OR (cr.cr_libelle_long = 'NEUROCHIRURGIE' AND ds.dos_libelle_court = 'NRDT Foch')
-            OR (cr.cr_libelle_long = 'ANESTHESIE' AND ds.dos_libelle_court = 'Obstétrique')
-        )
-        AND ((fo.type_document_code IN ('00209')) OR (fo.type_document_code = '00082'
-        AND s2.sej_uf_medicale_code IN ('290A', '294U')))
-        AND (format(p.pat_date_deces, 'yyyy/MM/dd') > format(s2.sej_date_sortie, 'yyyy/MM/dd')
-          OR p.pat_date_deces IS NULL)
+        END
+    ) >= 1
+    AND (
+        cr.cr_libelle_long = cr3.cr_libelle_long
+        OR Cr.cr_libelle_long = cr4.cr_libelle_long
+        OR (cr.cr_libelle_long = 'NEUROCHIRURGIE' AND ds.dos_libelle_court = 'NRDT Foch')
+        OR (cr.cr_libelle_long = 'ANESTHESIE' AND ds.dos_libelle_court = 'Obstétrique')
+    )
+    AND ((fo.type_document_code IN ('00209')) OR (fo.type_document_code = '00082'
+    AND s2.sej_uf_medicale_code IN ('290A', '294U')))
+    AND (format(p.pat_date_deces, 'yyyy/MM/dd') > format(s2.sej_date_sortie, 'yyyy/MM/dd')
+      OR p.pat_date_deces IS NULL)
     """
 
     # Requête SQL complète
@@ -497,6 +524,8 @@ def get_patient_reports(
                 item_copy["Type_courrier"] = ""
             if item_copy.get("Dos_Spe_ESL") is None:
                 item_copy["Dos_Spe_ESL"] = ""
+            if item_copy.get("Statut Envoi") is None:
+                item_copy["Statut Envoi"] = ""
 
             try:
                 # Créer une instance du modèle PatientRecord

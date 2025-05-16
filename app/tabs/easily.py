@@ -11,7 +11,7 @@ def display_easily_data(df):
         st.warning("Aucune donnée à afficher.")
         return
 
-    st.success(f"Requête terminée avec succès ! {len(df)} Lettre de liaison trouvés.")
+    st.success(f"Requête terminée avec succès ! {len(set(list(df['Num_Venue'])))} Lettre de liaison trouvés sur Easily.")
 
     # Onglets pour organiser l'affichage des données Easily
     data_tab, stats_tab, charts_tab = st.tabs(
@@ -33,7 +33,7 @@ def display_easily_data(df):
         col1, col2, col3 = st.columns(3)
 
         with col1:
-            st.metric("Nombre total de Lettre de liaison", len(df))
+            st.metric("Nombre total de Lettre de liaison", len(set(list(df['Num_Venue']))))
 
         with col2:
             if "pat_IPP" in df.columns:
@@ -42,7 +42,7 @@ def display_easily_data(df):
         with col3:
             if "LL_J0" in df.columns:
                 delay = df["LL_J0"].mean()
-                st.metric("Délai moyen de validation (jours)", f"{delay:.1f}")
+                st.metric("Délai moyen entre la sortie d'hospitalisation et la validation du document de liaison (jours)", f"{delay:.1f}")
 
         # Distribution par spécialité
         if "CR_Doss_spe" in df.columns:
@@ -95,19 +95,28 @@ def display_easily_data(df):
 
 
 # Fonction modifiée pour récupérer les données Easily avec filtrage par numéros de séjour
-def get_easily_data(start_date, end_date, num_venues=None):
+def get_easily_data(start_date, end_date, venue_numbers=None):
     """Récupère les Lettre de liaison patients depuis l'API Easily"""
     try:
-        # Préparer les paramètres de base
-        params = {
-            "start_date": start_date.strftime("%Y-%m-%d"),
-            "end_date": end_date.strftime("%Y-%m-%d"),
-        }
+        # Détermine le type de requête
+        is_venue_query = venue_numbers and len(venue_numbers) > 0
 
-        # Ajouter les numéros de séjour s'ils sont spécifiés
-        if num_venues and len(num_venues) > 0:
+        # Initialise params comme un dictionnaire vide
+        params = {}
+
+        # Si c'est une requête par numéros de séjour
+        if is_venue_query:
             # Convertir la liste de numéros en chaîne pour l'API
-            params["venues"] = ",".join([str(v) for v in num_venues])
+            params["venues"] = ",".join([str(v) for v in venue_numbers])
+        # Sinon, c'est une requête par date, vérifier que les dates ne sont pas None
+        elif start_date is not None and end_date is not None:
+            # Ajouter les dates formatées aux paramètres
+            params["start_date"] = start_date.strftime("%Y-%m-%d")
+            params["end_date"] = end_date.strftime("%Y-%m-%d")
+        else:
+            # Si aucun mode de requête valide n'est disponible
+            st.error("Veuillez fournir soit des numéros de séjour, soit des dates de début et de fin valides.")
+            return []
 
         # Appeler l'API avec les paramètres
         response = requests.get(EASILY_API_URL, params=params)

@@ -189,15 +189,16 @@ def execute_query_in_batches(conn, venues_list, start_date=None, end_date=None, 
 def get_lifen_data(
     num_venues: str | None = Query(
         None,
-        description="Liste des numéros de séjour séparés par des virgules (optionnel)",
+        description="List of venue numbers separated by commas (optional)",
     ),
-    start_date: str | None = Query(None, description="Date de début (format YYYY-MM-DD)"),
-    end_date: str | None = Query(None, description="Date de fin (format YYYY-MM-DD)"),
+    start_date: str | None = Query(None, description="Start date (format YYYY-MM-DD)"),
+    end_date: str | None = Query(None, description="End date (format YYYY-MM-DD)"),
+    use_easily_api: bool = Query(True, description="Whether to use Easily API for venue numbers when dates are provided"),
 ):
     try:
         venues_list = []
 
-        # Si num_venues est fourni, utiliser ces numéros
+        # If num_venues is provided, use these numbers
         if num_venues:
             venues_list = []
             for v in num_venues.split(","):
@@ -206,20 +207,27 @@ def get_lifen_data(
                 except (ValueError, TypeError):
                     logger.warning(f"Skipping invalid venue number: {v.strip()}")
             venues_list = list(set(venues_list))
-            logger.info(f"Recherche pour {len(venues_list)} séjours spécifiés")
-        # Sinon, récupérer les numéros de venue depuis l'API Easily
-        elif start_date and end_date:
+            logger.info(f"Searching for {len(venues_list)} specified venues")
+        # Otherwise, if dates are provided AND use_easily_api is True, get venue numbers from Easily API
+        elif start_date and end_date and use_easily_api:
             venues_list = get_venue_numbers_from_easily(start_date, end_date)
-            logger.info(f"Récupération de {len(venues_list)} séjours depuis l'API Easily")
+            logger.info(f"Retrieved {len(venues_list)} venues from Easily API")
+        # If dates are provided but use_easily_api is False, return an error
+        elif start_date and end_date:
+            logger.warning("Date range provided but use_easily_api is False")
+            raise HTTPException(
+                status_code=400,
+                detail="Cannot use date range without Easily API. Please provide venue numbers directly.",
+            )
         else:
             raise HTTPException(
                 status_code=400,
-                detail="Vous devez fournir soit 'num_venues', soit 'start_date' ET 'end_date'",
+                detail="You must provide either 'num_venues', or 'start_date' AND 'end_date' with use_easily_api=True",
             )
 
-        # Vérifier si nous avons des numéros de venue à rechercher
+        # Check if we have venue numbers to search for
         if not venues_list:
-            logger.warning("Aucun numéro de venue trouvé pour la recherche")
+            logger.warning("No venue numbers found for search")
             return []
 
         # Obtenir une connexion à la base de données Oracle

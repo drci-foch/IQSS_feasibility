@@ -6,8 +6,24 @@ import streamlit as st
 
 def create_download_link(df, filename):
     """Crée un lien de téléchargement pour un DataFrame"""
-    csv = df.to_csv(index=False)
-    b64 = base64.b64encode(csv.encode()).decode()
+    # Clean up any trailing carriage returns in string columns before conversion
+    df_clean = df.copy()
+
+    # For string columns only, clean up carriage returns
+    for col in df_clean.select_dtypes(include=['object']).columns:
+        if df_clean[col].dtype == 'object':  # Only process string columns
+            df_clean[col] = df_clean[col].astype(str).str.replace('\r', '')
+
+    # Use explicit line terminator and quoting parameters
+    csv = df_clean.to_csv(
+        index=False,
+        lineterminator='\n',      # Ensure consistent line endings
+        quoting=1,                 # csv.QUOTE_ALL - quote all fields
+        quotechar='"',             # Use double quotes
+        escapechar='\\'            # Use backslash as escape character
+    )
+
+    b64 = base64.b64encode(csv.encode('utf-8')).decode('utf-8')
     href = f'<a href="data:file/csv;base64,{b64}" download="{filename}" class="highlight">Télécharger {filename}</a>'
     return href
 

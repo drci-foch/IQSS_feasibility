@@ -1,16 +1,15 @@
+
 import pandas as pd
 import streamlit as st
-from datetime import datetime
-from app_conf import EASILY_API_URL, LIFEN_API_URL
-from style import custom_css
+from data_processor import process_data
 
 # Import modular components
 from sidebar import render_sidebar
-from data_processor import process_data
-from tabs_handler import render_initial_tabs, display_tabs_content
+from style import custom_css
+from tabs_handler import display_tabs_content, render_initial_tabs
 
 st.set_page_config(
-    page_title="Outil de Requête Lettre de liaison Patients",
+    page_title="QualiFoch",
     page_icon="🏥",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -18,14 +17,43 @@ st.set_page_config(
 
 st.markdown(custom_css, unsafe_allow_html=True)
 
+
 def main():
     # En-tête
     st.markdown(
-        "<h1 class='main-header'>Outil de Requête Lettre de liaison Patients</h1>",
+        """
+        <style>
+            .main-header {
+                font-size: 2.5em;
+                font-weight: bold;
+                text-align: center;
+                color: #2c3e50;
+                margin-bottom: 20px;
+            }
+            .description {
+                font-size: 1.2em;
+                line-height: 1.6;
+                color: #34495e;
+                text-align: center;
+            }
+        </style>
+        """,
         unsafe_allow_html=True,
     )
+
     st.markdown(
-        "Un outil pour analyser les Lettre de liaison patients validés et leur diffusion via Lifen."
+        "<h1 class='main-header'>QualiFoch - Analyse et Diffusion des Lettres de Liaison</h1>",
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(
+        """
+        <p class='description'>
+            QualiFoch est un outil dédié à l'analyse des lettres de liaison patients validées, 
+            ainsi qu'à leur diffusion sécurisée via Lifen.
+        </p>
+        """,
+        unsafe_allow_html=True,
     )
 
     # Initialize session state
@@ -36,13 +64,24 @@ def main():
 
     # Render sidebar and get user selections
     with st.sidebar:
-        start_date, end_date, filter_specialite, filter_result, filter_channel, run_query = render_sidebar()
+        query_type, start_date, end_date, imported_venues, filter_specialite, filter_result, filter_channel, run_query = render_sidebar()
 
     # Process data if requested or display cached data
     if run_query:
-        df_easily, df_lifen = process_data(start_date, end_date, filter_specialite, filter_result, filter_channel)
+        # Call process_data with all parameters from sidebar
+        df_easily, df_lifen = process_data(
+            query_type=query_type,
+            start_date=start_date,
+            end_date=end_date,
+            imported_venues=imported_venues,
+            filter_specialite=filter_specialite,
+            filter_result=filter_result,
+            filter_channel=filter_channel
+        )
+
         if df_easily is not None:
             display_tabs_content(df_easily, df_lifen)
+
     elif st.session_state.easily_data:
         # Use cached data
         df_easily = pd.DataFrame(st.session_state.easily_data)
@@ -51,6 +90,7 @@ def main():
     else:
         # Initial state - no data yet
         render_initial_tabs()
+
 
 if __name__ == "__main__":
     main()

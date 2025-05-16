@@ -7,27 +7,27 @@ from utils import create_download_link
 
 
 # Fonction pour récupérer les données Lifen pour les numéros de séjour spécifiés
-def get_lifen_data(num_venues, start_date, end_date):
+def get_lifen_data(num_venues, start_date=None, end_date=None):
     """Récupère les données Lifen pour les numéros de séjour spécifiés"""
     try:
         # Filtrer les num_venues valides
         valid_venues = [venue for venue in num_venues if venue and venue != 0]
-
         if not valid_venues:
             return []
 
         # Convertir en chaîne pour l'API
         venues_str = ",".join([str(v) for v in valid_venues])
 
-        # Appeler l'API Lifen avec les numéros de séjour
-        response = requests.get(
-            LIFEN_API_URL,
-            params={
-                "num_venues": venues_str,
-                "start_date": start_date.strftime("%Y-%m-%d"),
-                "end_date": end_date.strftime("%Y-%m-%d"),
-            },
-        )
+        # Préparer les paramètres de base
+        params = {"num_venues": venues_str}
+
+        # Ajouter les dates seulement si elles ne sont pas None
+        if start_date is not None and end_date is not None:
+            params["start_date"] = start_date.strftime("%Y-%m-%d")
+            params["end_date"] = end_date.strftime("%Y-%m-%d")
+
+        # Appeler l'API Lifen avec les paramètres
+        response = requests.get(LIFEN_API_URL, params=params)
 
         if response.status_code == 200:
             return response.json()
@@ -48,7 +48,7 @@ def display_lifen_data(df_lifen, df_easily):
         return
 
     st.success(
-        f"Données Lifen récupérées avec succès ! {len(df_lifen)} enregistrements trouvés."
+        f"Requête terminée avec succès !  {len(set(list(df_lifen['num_sej'])))} Lettre de liaison trouvés sur Lifen."
     )
 
     # Onglets pour organiser l'affichage des données Lifen

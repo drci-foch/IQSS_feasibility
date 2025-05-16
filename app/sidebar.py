@@ -1,6 +1,41 @@
-import streamlit as st
 from datetime import datetime, timedelta
+
+import streamlit as st
 from utils import import_venue_numbers
+
+
+def render_sidebar():
+    """Render the sidebar with all selection options"""
+    st.markdown("<h2 class='sub-header'>Paramètres de Requête</h2>", unsafe_allow_html=True)
+
+    # Add option to choose between date query and venue import
+    query_type = st.radio(
+        "Mode de requête",
+        ["Requête par date", "Requête par numéros de séjour"],
+        key="query_type"
+    )
+
+    # Variables to store filter values
+    start_date = None
+    end_date = None
+    imported_venues = []
+
+    # Display relevant section based on user choice
+    if query_type == "Requête par date":
+        start_date, end_date = setup_date_filters()
+    else:  # Requête par numéros de séjour
+        setup_venue_import()
+        imported_venues = st.session_state.get("imported_venues", [])
+
+    # Set up advanced filters (same for both query types)
+    filter_specialite, filter_result, filter_channel = setup_advanced_filters()
+
+    # Bouton de requête
+    st.markdown("<br>", unsafe_allow_html=True)
+    run_query = st.button("Exécuter la Requête", type="primary", use_container_width=True)
+
+    return query_type, start_date, end_date, imported_venues, filter_specialite, filter_result, filter_channel, run_query
+
 
 def setup_date_filters():
     """Handle date period selection in the sidebar"""
@@ -36,50 +71,60 @@ def setup_date_filters():
             start_date = datetime(end_date.year, 1, 1).date()
 
         st.info(f"Période sélectionnée : {start_date.strftime('%d/%m/%Y')} à {end_date.strftime('%d/%m/%Y')}")
-    
+
     return start_date, end_date
+
 
 def setup_venue_import():
     """Handle venue number import functionality"""
     st.markdown("<h3>Importation de Numéros de Séjour</h3>", unsafe_allow_html=True)
-    with st.expander("Importer des numéros de séjour", expanded=False):
-        st.markdown("""
-        Vous pouvez importer un fichier contenant des numéros de séjour à ajouter à votre requête.
-        Les formats acceptés sont : CSV, Excel (.xls/.xlsx) ou TXT (un numéro par ligne).
-        """)
 
-        uploaded_file = st.file_uploader(
-            "Choisir un fichier", type=["csv", "xlsx", "xls", "txt"], key="sidebar_file_uploader"
-        )
+    # No need for expander since this is now a main option
+    st.markdown("""
+    Vous pouvez importer un fichier contenant des numéros de séjour à ajouter à votre requête.
+    Les formats acceptés sont : CSV, Excel (.xls/.xlsx) ou TXT (un numéro par ligne).
+    """)
 
-        # Variable pour stocker les numéros de séjour importés
-        if "imported_venues" not in st.session_state:
+    uploaded_file = st.file_uploader(
+        "Choisir un fichier", type=["csv", "xlsx", "xls", "txt"], key="sidebar_file_uploader"
+    )
+
+    # Variable pour stocker les numéros de séjour importés
+    if "imported_venues" not in st.session_state:
+        st.session_state.imported_venues = []
+
+    # Variable pour conserver les numéros de séjour originaux importés
+    if "original_imported_venues" not in st.session_state:
+        st.session_state.original_imported_venues = []
+
+    if uploaded_file is not None:
+        if st.button("Charger les numéros de séjour"):
+            # Lire les numéros de séjour du fichier
+            imported_venues = import_venue_numbers(uploaded_file)
+            st.session_state.imported_venues = imported_venues
+            # Sauvegarder la liste originale pour comparaison ultérieure
+            st.session_state.original_imported_venues = imported_venues.copy()
+
+            if imported_venues:
+                st.success(f"{len(imported_venues)} numéros de séjour importés avec succès.")
+                # Afficher un aperçu des premiers numéros
+                preview = imported_venues[:5]
+                preview_text = ", ".join([str(num) for num in preview])
+                if len(imported_venues) > 5:
+                    preview_text += f", ... (et {len(imported_venues) - 5} de plus)"
+                st.info(f"Aperçu : {preview_text}")
+            else:
+                st.warning("Aucun numéro de séjour valide trouvé dans le fichier.")
+
+    # Afficher les numéros de séjour importés s'il y en a
+    if st.session_state.imported_venues:
+        st.text(f"{len(st.session_state.imported_venues)} numéros de séjour seront inclus dans la requête.")
+
+        if st.button("Effacer les numéros importés"):
             st.session_state.imported_venues = []
+            st.session_state.original_imported_venues = []
+            st.rerun()
 
-        if uploaded_file is not None:
-            if st.button("Charger les numéros de séjour"):
-                # Lire les numéros de séjour du fichier
-                imported_venues = import_venue_numbers(uploaded_file)
-                st.session_state.imported_venues = imported_venues
-
-                if imported_venues:
-                    st.success(f"{len(imported_venues)} numéros de séjour importés avec succès.")
-                    # Afficher un aperçu des premiers numéros
-                    preview = imported_venues[:5]
-                    preview_text = ", ".join([str(num) for num in preview])
-                    if len(imported_venues) > 5:
-                        preview_text += f", ... (et {len(imported_venues) - 5} de plus)"
-                    st.info(f"Aperçu : {preview_text}")
-                else:
-                    st.warning("Aucun numéro de séjour valide trouvé dans le fichier.")
-
-        # Afficher les numéros de séjour importés s'il y en a
-        if st.session_state.imported_venues:
-            st.text(f"{len(st.session_state.imported_venues)} numéros de séjour seront inclus dans la requête.")
-
-            if st.button("Effacer les numéros importés"):
-                st.session_state.imported_venues = []
-                st.rerun()
 
 def setup_advanced_filters():
     """Set up advanced filters in the sidebar"""
@@ -107,24 +152,5 @@ def setup_advanced_filters():
         filter_channel = st.multiselect(
             "Filtrer par canal", ["DMP", "MSSANTE", "APICRYPT", "MAIL", "PAPIER"], key="filter_by_channel"
         )
-        
-    return filter_specialite, filter_result, filter_channel
 
-def render_sidebar():
-    """Render the sidebar with all selection options"""
-    st.markdown("<h2 class='sub-header'>Paramètres de Requête</h2>", unsafe_allow_html=True)
-    
-    # Get dates
-    start_date, end_date = setup_date_filters()
-    
-    # Set up venue import
-    setup_venue_import()
-    
-    # Set up advanced filters
-    filter_specialite, filter_result, filter_channel = setup_advanced_filters()
-    
-    # Bouton de requête
-    st.markdown("<br>", unsafe_allow_html=True)
-    run_query = st.button("Exécuter la Requête", type="primary", use_container_width=True)
-    
-    return start_date, end_date, filter_specialite, filter_result, filter_channel, run_query
+    return filter_specialite, filter_result, filter_channel
