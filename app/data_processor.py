@@ -71,7 +71,7 @@ def process_data(query_type=None, start_date=None, end_date=None, imported_venue
             st.session_state.missing_venues_both = sorted(list(missing_venues_both))
 
             if missing_venues_both:
-                st.info(f"{len(missing_venues_both)} numéros de séjour n'ont été retrouvés ni dans Easily ni dans Lifen.")
+                st.info(f"{len(missing_venues_both)} numéro(s) de séjour n'a/n'ont pas été retrouvés dans Easily ou Lifen.")
 
         else:
             # Pour les requêtes par date, utiliser les dates sélectionnées

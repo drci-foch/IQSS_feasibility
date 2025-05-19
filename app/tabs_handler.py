@@ -30,7 +30,7 @@ def render_initial_tabs():
 def display_tabs_content(df_easily, df_lifen):
     """Display content in each tab based on available data"""
     easily_tab, lifen_tab, analyse_tab = st.tabs(
-        ["Easily (Lettre de liaison)", "Lifen (Diffusion)", "Analyse des délais"]
+        ["Source Easily", "Source Lifen", "Comparaison Easily/Lifen"]
     )
 
     with easily_tab:

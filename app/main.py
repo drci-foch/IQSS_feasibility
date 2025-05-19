@@ -42,14 +42,14 @@ def main():
     )
 
     st.markdown(
-        "<h1 class='main-header'>QualiFoch - Analyse et Diffusion des Lettres de Liaison</h1>",
+        "<h1 class='main-header'>SEQUAD : Sécurité, Évaluation et Qualité des Données </h1>",
         unsafe_allow_html=True,
     )
 
     st.markdown(
         """
         <p class='description'>
-            QualiFoch est un outil dédié à l'analyse des lettres de liaison patients validées, 
+            SEQUAD est un outil dédié à l'analyse des lettres de liaison patients validées, 
             ainsi qu'à leur diffusion sécurisée via Lifen.
         </p>
         """,

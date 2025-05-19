@@ -11,17 +11,17 @@ def display_analyse_documents(df_lifen, df_easily):
 ## Objectif de l'analyse
 Cette analyse vous permet d'évaluer les délais de transmission des lettres de liaison aux patients à travers trois mesures clés :
 
-1. **Délai global** : Temps écoulé entre la date de sortie du patient et la date d'envoi du document via Lifen.
-2. **Délai pour lettres validées le jour de la sortie** : Focus sur les lettres validées exactement le jour de sortie du patient, permettant d'évaluer l'efficacité du processus idéal.
-3. **Délai depuis la validation médicale** : Temps écoulé entre la validation par le médecin et l'envoi effectif du document, indépendamment de la date de sortie.
+1. **Délai global** : Temps écoulé entre la date de sortie du patient sur Easily et la date d'envoi du document via Lifen.
+2. **Délai pour lettres validées le jour de la sortie** : Focus sur les lettres validées exactement le jour de sortie du patient.
+3. **Délai depuis la validation médicale** : Temps écoulé entre la validation de la lettre de liaison par le médecin et l'envoi effectif du document via Lifen, indépendamment de la date de sortie.
 
 ## Filtres appliqués
-- Seuls les documents destinés aux patients (rôle_destinataire = "Patient" dans Lifen) sont analysés.
-- Les lettres validées plus de 3 jours avant la sortie sont exclues pour éviter les biais.
+- Seuls les documents du type LL destinés aux patients sont analysés.
+- Les LL validées plus de 3 jours avant la sortie sont exclues.
 - Pour chaque séjour, seul l'envoi le plus proche de la date de sortie est conservé.
 - L'archivage des données Lifen remonte jusqu'au 01/01/2023.
 
-Ces statistiques permettent d'identifier les étapes du processus qui peuvent être optimisées pour améliorer les délais d'envoi.
+Ces statistiques permettent de contrôler l'indicateur de qualité et de sécurité des soins sur les lettres de liaison.
     """)
     st.info(
         "Il est possible de télécharger le document utilisé pour l'analyse en bas de page."
@@ -239,11 +239,11 @@ Ces statistiques permettent d'identifier les étapes du processus qui peuvent ê
 
 
     # Affichage des résultats
-    st.subheader("Distribution des délais diffusion-sortie (Source optimale)")
+    st.subheader("Distribution des délais diffusion-sortie")
     fig = px.histogram(
         df_merge,
         x="diff_date_diffusion_sortie",
-        title="Distribution des délais entre diffusion et sortie (Source optimale)",
+        title="Distribution des délais entre diffusion et sortie",
         nbins=100,
         labels={"diff_date_diffusion_sortie": "Délai (jours)"},
         template="plotly_white",

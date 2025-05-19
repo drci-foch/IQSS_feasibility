@@ -11,7 +11,7 @@ def render_sidebar():
     # Add option to choose between date query and venue import
     query_type = st.radio(
         "Mode de requête",
-        ["Requête par date", "Requête par numéros de séjour"],
+        ["Par date", "Par numéros de séjour"],
         key="query_type"
     )
 
@@ -21,7 +21,7 @@ def render_sidebar():
     imported_venues = []
 
     # Display relevant section based on user choice
-    if query_type == "Requête par date":
+    if query_type == "Par date":
         start_date, end_date = setup_date_filters()
     else:  # Requête par numéros de séjour
         setup_venue_import()
@@ -77,7 +77,7 @@ def setup_date_filters():
 
 def setup_venue_import():
     """Handle venue number import functionality"""
-    st.markdown("<h3>Importation de Numéros de Séjour</h3>", unsafe_allow_html=True)
+    st.markdown("<h3>Import de Numéros de Séjour</h3>", unsafe_allow_html=True)
 
     # No need for expander since this is now a main option
     st.markdown("""
@@ -118,7 +118,7 @@ def setup_venue_import():
 
     # Afficher les numéros de séjour importés s'il y en a
     if st.session_state.imported_venues:
-        st.text(f"{len(st.session_state.imported_venues)} numéros de séjour seront inclus dans la requête.")
+        st.text(f"{len(st.session_state.imported_venues)} numéros de séjour détéctés.")
 
         if st.button("Effacer les numéros importés"):
             st.session_state.imported_venues = []
