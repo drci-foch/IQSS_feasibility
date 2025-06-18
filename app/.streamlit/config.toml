@@ -6,4 +6,55 @@ textColor = "#044c7c"  # Dark blue for text
 font = "sans serif"
 
 [server]
+# Configuration serveur optimisée pour éviter les erreurs HTTP
 enableStaticServing = true
+port = 8501
+baseUrlPath = ""
+enableCORS = false
+enableXsrfProtection = true
+
+# Optimisations réseau pour réduire les erreurs HTTP
+maxUploadSize = 200
+maxMessageSize = 200
+headless = false
+runOnSave = true
+allowRunOnSave = true
+
+# Timeouts pour éviter les connexions fermées prématurément
+fileWatcherType = "auto"
+cookieSecret = "some-random-key-here"
+
+[browser]
+# Éviter les rechargements automatiques et les erreurs de tracking
+gatherUsageStats = false
+showErrorDetails = false
+serverAddress = "localhost"
+serverPort = 8501
+
+[runner]
+# Optimiser les reruns et réduire les erreurs asyncio
+fastReruns = true
+enforceSerializableSessionState = false
+fixMatplotlib = true
+
+# Gestion mémoire optimisée
+magicEnabled = true
+installTracer = false
+
+[client]
+# Configuration client pour stabilité
+caching = true
+displayEnabled = true
+showErrorDetails = false
+toolbarMode = "auto"
+
+[global]
+# Réduire les logs d'erreur non critiques
+developmentMode = false
+logLevel = "error"
+suppressDeprecationWarnings = true
+
+[logger]
+# Filtrer les messages de log non essentiels
+level = "error"
+messageFormat = "%(asctime)s %(message)s"

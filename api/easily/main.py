@@ -55,8 +55,8 @@ class PatientRecord(BaseModel):
     fic_date_creation: datetime
     fic_date_modification: datetime | None = None
     date_min_val: datetime
-    date_diffusion: str = Field(alias="Date diffusion")
-    statut_envoi: str = Field(alias="Statut Envoi")
+    date_diffusion: str | None = Field(alias="Date diffusion", default=None)
+    statut_envoi: str | None = Field(alias="Statut Envoi", default=None)
 
     class Config:
         populate_by_name = True

@@ -75,9 +75,18 @@ Ces statistiques permettent de contrôler l'indicateur de qualité et de sécuri
     # Pour chaque fiche_id, trouver l'index de la ligne avec la différence minimale
     idx = df_easily.groupby('fiche_id')['time_diff'].idxmin()
 
-    # Sélectionner ces lignes du dataframe original
-    df_easily_keep_only_good_dates = df_easily.loc[idx]
+    # On drop les nan values pour éviter les erreurs dans l'application 
+    df_easily_valid = df_easily.dropna(subset=['time_diff'])
 
+    if not df_easily_valid.empty:
+        idx = df_easily_valid.groupby('fiche_id')['time_diff'].idxmin()
+        # Remove any NaN indices that might still exist
+        idx = idx.dropna()
+        # Sélectionner ces lignes du dataframe original
+        df_easily_keep_only_good_dates = df_easily.loc[idx]
+    else:
+        # Handle case where no valid data exists
+        df_easily_keep_only_good_dates = pd.DataFrame(columns=df_easily.columns)
 
 
         # Filtrage et renommage des colonnes pour Lifen
