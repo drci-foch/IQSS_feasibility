@@ -1,4 +1,5 @@
 import logging
+import math
 import os
 from datetime import date
 
@@ -33,7 +34,6 @@ app.add_middleware(
 )
 
 # Modèle de données pour la réponse Lifen basé sur la structure réelle de la table
-
 
 class LifenRecord(BaseModel):
     # Champs existants
@@ -102,6 +102,8 @@ def get_venue_numbers_from_easily(start_date: str, end_date: str):
         # Paramètres de la requête
         params = {"start_date": start_date, "end_date": end_date}
 
+        logger.info(f"Appel à l'API Easily avec les paramètres: {params}")
+
         # Effectuer la requête à l'API Easily
         response = requests.get(easily_api_url, params=params)
 
@@ -115,17 +117,61 @@ def get_venue_numbers_from_easily(start_date: str, end_date: str):
 
         # Récupérer les données de la réponse
         data = response.json()
+        logger.info(f"API Easily a retourné {len(data)} enregistrements")
 
         # Extraire les numéros de venue
         venue_numbers = []
-        for item in data:
-            if "Num_Venue" in item and item["Num_Venue"]:
-                try:
-                    venue_numbers.append(int(item["Num_Venue"]))  # Convert to integer
-                except (ValueError, TypeError):
-                    logger.warning(f"Skipping invalid venue number: {item['Num_Venue']}")
+        invalid_venues = []
+        nan_venues = 0
 
-        logger.info(f"Récupération de {len(venue_numbers)} numéros de venue depuis l'API Easily")
+        for i, item in enumerate(data):
+            if "Num_Venue" in item:
+                venue_value = item["Num_Venue"]
+                logger.debug(f"Item {i}: Num_Venue = {venue_value} (type: {type(venue_value)})")
+
+                # Vérifier si c'est NaN
+                if venue_value is None:
+                    logger.warning(f"Item {i}: Num_Venue est None")
+                    continue
+
+                # Vérifier si c'est un float NaN
+                if isinstance(venue_value, float) and math.isnan(venue_value):
+                    nan_venues += 1
+                    logger.warning(f"Item {i}: Num_Venue est NaN")
+                    continue
+
+                # Vérifier si c'est une string "nan" ou "NaN"
+                if isinstance(venue_value, str) and venue_value.lower() in ['nan', 'null', '']:
+                    nan_venues += 1
+                    logger.warning(f"Item {i}: Num_Venue est '{venue_value}' (string NaN)")
+                    continue
+
+                # Essayer de convertir en entier
+                try:
+                    venue_int = int(float(venue_value))  # float() d'abord pour gérer les strings numériques
+                    if venue_int > 0:  # Ignorer les venues <= 0
+                        venue_numbers.append(venue_int)
+                    else:
+                        logger.warning(f"Item {i}: Num_Venue <= 0: {venue_int}")
+                except (ValueError, TypeError, OverflowError) as e:
+                    invalid_venues.append(venue_value)
+                    logger.warning(f"Item {i}: Impossible de convertir Num_Venue '{venue_value}': {e}")
+            else:
+                logger.warning(f"Item {i}: Pas de champ 'Num_Venue'")
+
+        # Supprimer les doublons
+        venue_numbers = list(set(venue_numbers))
+
+        logger.info("Résumé de récupération des venues:")
+        logger.info(f"  - Total d'enregistrements: {len(data)}")
+        logger.info(f"  - Venues valides: {len(venue_numbers)}")
+        logger.info(f"  - Venues NaN: {nan_venues}")
+        logger.info(f"  - Venues invalides: {len(invalid_venues)}")
+        if invalid_venues:
+            logger.info(f"  - Exemples de venues invalides: {invalid_venues[:5]}")
+        if venue_numbers:
+            logger.info(f"  - Exemples de venues valides: {sorted(venue_numbers)[:10]}")
+
         return venue_numbers
 
     except Exception as e:
@@ -134,7 +180,6 @@ def get_venue_numbers_from_easily(start_date: str, end_date: str):
             status_code=500,
             detail=f"Erreur lors de la récupération des numéros de venue: {str(e)}",
         )
-
 
 # Fonction pour exécuter la requête par lots
 def execute_query_in_batches(conn, venues_list, start_date=None, end_date=None, batch_size=500):
