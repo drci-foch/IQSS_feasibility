@@ -11,7 +11,7 @@ def display_easily_data(df):
         st.warning("Aucune donnée à afficher.")
         return
 
-    st.success(f"{len(set(list(df['Num_Venue'])))} Lettre de liaison trouvés sur Easily.")
+    st.success(f"{len(set(df['Num_Venue']))} Lettre de liaison trouvés sur Easily.")
 
     # Onglets pour organiser l'affichage des données Easily
     data_tab, stats_tab, charts_tab = st.tabs(
@@ -33,7 +33,7 @@ def display_easily_data(df):
         col1, col2, col3 = st.columns(3)
 
         with col1:
-            st.metric("Nombre total de Lettre de liaison", len(set(list(df['Num_Venue']))))
+            st.metric("Nombre total de Lettre de liaison", len(set(df['Num_Venue'])))
 
         with col2:
             if "pat_IPP" in df.columns:
@@ -42,7 +42,9 @@ def display_easily_data(df):
         with col3:
             if "LL_J0" in df.columns:
                 delay = df["LL_J0"].mean()
-                st.metric("Délai moyen entre la sortie d'hospitalisation et la validation du document de liaison (jours)", f"{delay:.1f}")
+                st.metric("Délai moyen entre la sortie d'hospitalisation et la validation du " \
+                "document de liaison (jours)",
+                          f"{delay:.1f}")
 
         # Distribution par spécialité
         if "CR_Doss_spe" in df.columns:

@@ -12,7 +12,8 @@ def render_initial_tabs():
 
     with easily_tab:
         st.info(
-            "Utilisez la barre latérale pour configurer votre requête, puis cliquez sur 'Exécuter la Requête' pour voir les résultats."
+            "Utilisez la barre latérale pour configurer votre requête, puis cliquez sur 'Exécuter la Requête' " \
+            "pour voir les résultats."
         )
 
     with lifen_tab:
