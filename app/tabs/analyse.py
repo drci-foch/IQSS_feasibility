@@ -548,7 +548,7 @@ def display_analyse_documents(df_lifen, df_easily):
             fig_heatmap = px.imshow(
                 df_heatmap.T,
                 title="Délais moyens par service (jours)",
-                labels=dict(x="Service", y="Type de délai", color="Délai (jours)"),
+                labels={"x": "Service", "y": "Type de délai", "color": "Délai (jours)"},
                 aspect="auto",
                 color_continuous_scale="RdYlGn_r"  # Rouge = délai élevé, Vert = délai faible
             )
@@ -613,7 +613,7 @@ def display_analyse_documents(df_lifen, df_easily):
     # EXCLUSION DES LL VALIDÉES LE WEEKEND
 
     # Convertir date_min_val_easily en datetime si ce n'est pas déjà fait
-    df_merge['date_min_val_easily_dt'] = pd.to_datetime(df_merge['date_min_val_easily'])
+    df_merge['date_min_val_easily_dt'] = pd.to_datetime(df_merge['date_min_val_easily'], dayfirst=True)
 
     # Ajouter une colonne pour identifier le jour de la semaine (0=Lundi, 6=Dimanche)
     df_merge['jour_semaine_validation'] = df_merge['date_min_val_easily_dt'].dt.dayofweek
@@ -622,7 +622,7 @@ def display_analyse_documents(df_lifen, df_easily):
     df_merge_sans_weekend = df_merge[~df_merge['jour_semaine_validation'].isin([5, 6])].copy()
 
     # Afficher les informations de filtrage
-    nb_total = len(df_merge)
+    len(df_merge)
     nb_weekend = len(df_merge[df_merge['jour_semaine_validation'].isin([5, 6])])
     nb_sans_weekend = len(df_merge_sans_weekend)
 
@@ -632,7 +632,8 @@ def display_analyse_documents(df_lifen, df_easily):
         return
 
     st.subheader("Délai d'envoi à J0 de la date de validation (hors weekend)")
-    st.info(f"📊 Filtrage des validations weekend : {nb_total} total → {nb_sans_weekend} hors weekend ({nb_weekend} validations weekend exclues)")
+    st.info(f"📊 **{nb_sans_weekend} hors weekend "
+         f"({nb_weekend} validations weekend exclues)")
 
     df_merge_sans_weekend = df_merge_sans_weekend[df_merge_sans_weekend["delai_envoi_validation"] >= -3]
 
@@ -662,7 +663,8 @@ def display_analyse_documents(df_lifen, df_easily):
             template="plotly_white"
         )
         # Colorer les weekends en rouge
-        colors = ['lightblue' if jour not in ['Samedi', 'Dimanche'] else 'lightcoral' for jour in repartition_jours.index]
+        colors = ['lightblue' if jour not in ['Samedi', 'Dimanche'] else 'lightcoral' for jour in
+                  repartition_jours.index]
         fig_jours.update_traces(marker_color=colors)
         st.plotly_chart(fig_jours, use_container_width=True)
 

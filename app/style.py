@@ -7,7 +7,7 @@ custom_css =  """
         --light-color: #f8f9fa;
         --text-color: #333333;
     }
-    
+
     /* Style général */
     .main-header {
         font-size: 2.5rem;

@@ -49,7 +49,7 @@ def main():
     st.markdown(
         """
         <p class='description'>
-            SEQUAD est un outil dédié à l'analyse des lettres de liaison patients validées, 
+            SEQUAD est un outil dédié à l'analyse des lettres de liaison patients validées,
             ainsi qu'à leur diffusion sécurisée via Lifen.
         </p>
         """,

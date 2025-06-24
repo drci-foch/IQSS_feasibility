@@ -60,15 +60,15 @@ def process_data(query_type=None, start_date=None, end_date=None, imported_venue
 
             # Numéros manquants dans Easily
             missing_venues_easily = original_venues - found_venues_easily
-            st.session_state.missing_venues_easily = sorted(list(missing_venues_easily))
+            st.session_state.missing_venues_easily = sorted(missing_venues_easily)
 
             # Numéros manquants dans Lifen
             missing_venues_lifen = original_venues - found_venues_lifen
-            st.session_state.missing_venues_lifen = sorted(list(missing_venues_lifen))
+            st.session_state.missing_venues_lifen = sorted(missing_venues_lifen)
 
             # Numéros manquants dans les deux systèmes
             missing_venues_both = missing_venues_easily.intersection(missing_venues_lifen)
-            st.session_state.missing_venues_both = sorted(list(missing_venues_both))
+            st.session_state.missing_venues_both = sorted(missing_venues_both)
 
             if missing_venues_both:
                 st.info(f"{len(missing_venues_both)} numéro(s) de séjour n'a/n'ont pas été retrouvés dans Easily ou Lifen.")

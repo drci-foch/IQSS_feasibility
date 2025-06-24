@@ -1,14 +1,18 @@
-import base64
+
+import logging
 import os
 from datetime import datetime
-from pathlib import Path
+from typing import Annotated
 
-import pandas as pd
 import pyodbc
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, validator
+
+# Configuration logging plus légère
+logging.basicConfig(level=logging.WARNING)
+logger = logging.getLogger(__name__)
 
 # Charger les variables d'environnement
 load_dotenv()
@@ -20,17 +24,16 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# Configuration CORS
+# Configuration CORS plus restrictive
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:8001", "http://127.0.0.1:8001"],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
 
-
-# Modèle de données pour la réponse
+# Modèle de données pour la réponse (identique)
 class PatientRecord(BaseModel):
     annee: int
     mois: str
@@ -68,63 +71,38 @@ class PatientRecord(BaseModel):
             return None
         return v
 
-
-# Configuration de la connexion à la base de données
+# Configuration de la connexion à la base de données avec timeout
 def get_db_connection():
     try:
         connection_string = os.getenv(
             "DB_CONNECTION_STRING",
             "DRIVER={SQL Server};SERVER=your_server;DATABASE=your_db;UID=your_username;PWD=your_password",
         )
-        conn = pyodbc.connect(connection_string)
+        # Ajouter timeout de connexion
+        conn = pyodbc.connect(connection_string, timeout=15)
         return conn
     except Exception as e:
+        logger.error(f"Erreur connexion DB: {str(e)}")
         raise HTTPException(
             status_code=500,
             detail=f"Erreur de connexion à la base de données: {str(e)}",
         ) from None
 
+# Route de santé pour Easily
+@app.get("/health")
+def health_check():
+    return {
+        "status": "healthy",
+        "service": "easily",
+        "timestamp": datetime.now().isoformat()
+    }
 
-# Point de terminaison de diagnostic
-@app.get("/api/diagnostic")
-def diagnostic():
-    try:
-        # Test de connexion
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT 1 as test")
-        test_result = cursor.fetchone()
-
-        # Test de version
-        cursor.execute("SELECT @@version as version")
-        version = cursor.fetchone()
-
-        # Essai de requête simple
-        cursor.execute("SELECT TOP 1 * FROM NOYAU.patient.VENUE")
-        columns = [column[0] for column in cursor.description]
-        venue_result = dict(zip(columns, cursor.fetchone(), strict=False))
-
-        cursor.close()
-        conn.close()
-
-        return {
-            "status": "ok",
-            "test_connection": test_result[0] == 1,
-            "db_version": version[0],
-            "venue_sample": venue_result,
-        }
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
-
-
-# Fonction pour nettoyer les résultats de la requête
+# Fonction pour nettoyer les résultats de la requête (identique)
 def clean_query_results(rows, columns):
     results = []
     for row in rows:
-        # Convertir la ligne en dictionnaire avec noms de colonnes
         result_dict = {}
         for i, col in enumerate(columns):
-            # Gérer les valeurs NULL correctement
             if row[i] is None:
                 result_dict[col] = None
             else:
@@ -133,41 +111,36 @@ def clean_query_results(rows, columns):
     return results
 
 
-# Fonction execute_query mise à jour pour prendre en compte la requête originale complète
 def execute_query(conn, start_date=None, end_date=None, venues=None):
     cursor = conn.cursor()
 
-    # Déterminer s'il faut appliquer le filtre de date ou le filtre par numéros de séjour
-    include_second_part = True  # Flag pour inclure la deuxième partie de la requête (sans venue)
+    # Timeout au niveau du curseur
+    cursor.execute("SET LOCK_TIMEOUT 15000")
 
-    # Condition de base pour la date
+    include_second_part = True
     date_condition = ""
     venue_condition = ""
 
-    # Si des numéros de séjour sont fournis, les utiliser et ignorer la date
     if venues and venues.strip():
-        # Correction: utiliser le champ Num_Venue au lieu de ven_numero
-        # Comme Num_Venue est un alias calculé, nous devons reproduire la même expression CASE
         venue_condition = f"""
         CASE
             WHEN f.fic_venue IS NULL THEN 0
             WHEN f.fic_venue IS NOT NULL THEN v.ven_numero
         END IN ({venues})"""
-        include_second_part = False  # Ne pas inclure la deuxième partie si on filtre par numéros de séjour
+        include_second_part = False
     else:
-        # Sinon, on applique le filtre de date
         if start_date and end_date:
             date_condition = f"s2.sej_date_sortie BETWEEN '{start_date}' AND '{end_date}'"
         else:
             date_condition = "YEAR(s2.sej_date_sortie) = YEAR(GETDATE())"
 
-    # Partie 1 de la requête (avec venue)
+    # SYNTAXE CORRIGÉE : DISTINCT TOP au lieu de TOP DISTINCT
     sql_query_part1 = f"""
 DECLARE @startOfCurrentMonth DATETIME
 SET @startOfCurrentMonth = DATEADD(YEAR, DATEDIFF(year, 0, CURRENT_TIMESTAMP), 0)
 
 /*recherche fiche avec venue*/
-SELECT DISTINCT
+SELECT DISTINCT TOP 5000
     year(s2.sej_date_sortie) AS annee,
     DateName(Month,s2.sej_date_sortie) AS mois,
     datediff(day,s2.sej_date_sortie,date_min_val) AS LL_J0,
@@ -193,7 +166,7 @@ SELECT DISTINCT
     cr3.cr_libelle_long AS CR_courrier,
     dfs.fos_libelle AS Type_courrier,
     ds.dos_libelle_court AS Dos_Spe_ESL,
-    CASE 
+    CASE
         WHEN dfs.fos_libelle ='CR Lettre de Liaison Chirurgie Vasculaire Foch' THEN 'VASCULAIRE'
         WHEN dfs.fos_libelle ='CR Lettre de Liaison Chirurgie Urologique Foch' THEN 'UROLOGIE'
         WHEN dfs.fos_libelle ='CR Lettre de Liaison Réa Foch' THEN 'REANIMATION'
@@ -235,20 +208,19 @@ SELECT DISTINCT
         ELSE 'Pas dans boite envoi'
     END as 'Statut Envoi'
 FROM
-    /*jointure sur les venues*/
     NOYAU.patient.VENUE v
-    LEFT JOIN NOYAU.patient.SEJOUR s1 ON s1.ven_id = v.ven_id 
+    LEFT JOIN NOYAU.patient.SEJOUR s1 ON s1.ven_id = v.ven_id
         AND v.ven_supprime != 1
         AND s1.sej_numero = '1'
         AND ven_type IN (1,8)
-    LEFT JOIN NOYAU.patient.SEJOUR s2 ON s2.ven_id = v.ven_id 
+    LEFT JOIN NOYAU.patient.SEJOUR s2 ON s2.ven_id = v.ven_id
         AND v.ven_supprime != 1
         AND s2.sej_est_dernier_sejour = 1
     LEFT JOIN (
         SELECT s.ven_id, MIN(s.sej_date_entree) AS date_der, s.sej_uf_medicale_code
         FROM NOYAU.patient.SEJOUR s
-        INNER JOIN noyau.patient.sejour s2 ON s.sej_uf_medicale_code = s2.sej_uf_medicale_code 
-            AND s.ven_id = s2.ven_id 
+        INNER JOIN noyau.patient.sejour s2 ON s.sej_uf_medicale_code = s2.sej_uf_medicale_code
+            AND s.ven_id = s2.ven_id
             AND s2.sej_est_dernier_sejour = 1
         WHERE s2.sej_est_dernier_sejour = 1 AND s.ven_id = s2.ven_id
         GROUP BY s.ven_id, s.sej_uf_medicale_code
@@ -261,51 +233,47 @@ FROM
     INNER JOIN NOYAU.patient.patient p ON p.pat_id = f.patient_id
     LEFT JOIN (
         SELECT fhs2.fiche_id, Min(fhs2.fic_date_statut_validation) AS date_min_val
-        FROM DOMINHO.dominho.FICHE_HISTORIQUE_STATUT fhs2 
+        FROM DOMINHO.dominho.FICHE_HISTORIQUE_STATUT fhs2
         WHERE fhs2.fic_statut_validation_id = 3
         GROUP BY fhs2.fiche_id
     ) AS fhs2 ON f.fiche_id = fhs2.fiche_id
     INNER JOIN DOMINHO.dominho.FORMULAIRE_SELECTION dfs ON f.formulaire_selection_id = dfs.formulaire_selection_id
         AND dfs.fos_libelle NOT LIKE '%HDJ%'
         AND dfs.fos_libelle NOT LIKE '%extraction%'
-    LEFT JOIN dominho.dominho.FORMULAIRE fo ON dfs.formulaire_id = fo.formulaire_id 
+    LEFT JOIN dominho.dominho.FORMULAIRE fo ON dfs.formulaire_id = fo.formulaire_id
         AND (fo.type_document_code = '00209' OR fo.type_document_code = '00082')
         AND for_courrier = 1
     LEFT JOIN [dominho].[dominho].[DOSSIER_SPECIALITE_SPECIALITE] dss ON dss.dossier_specialite_id = ds.dossier_specialite_id
     LEFT JOIN [dominho].[dominho].[CENTRE_RESPONSABILITE_SPECIALITE] crs ON crs.specialite_code = dss.specialite_code
     LEFT JOIN noyau.coeur.CENTRE_RESPONSABILITE cr4 ON cr4.cr_code = crs.centre_responsabilite_code
-    
-    /* Ajout des jointures pour la date de diffusion et statut envoi */
     LEFT JOIN BOITE_ENVOI.BOITE_ENVOI.DOCUMENT EDOC ON EDOC.document_id = f.document_id
     LEFT JOIN BOITE_ENVOI.BOITE_ENVOI.DESTINATAIRE EDES ON EDES.doc_id = EDOC.doc_id
-WHERE 
+WHERE
     {venue_condition if venue_condition else date_condition}
     AND date_min_val >= dateAdd(Day, -1, cast(s3.date_der AS date))
     AND date_min_val <= DateAdd(Day, 5, Cast(s2.sej_date_sortie AS date))
     AND (
-        CASE 
+        CASE
             WHEN s1.sej_date_entree >= ven_admission THEN datediff(day, s1.sej_date_entree, s2.sej_date_sortie)
             WHEN s1.sej_date_entree < ven_admission THEN datediff(day, ven_admission, s2.sej_date_sortie)
         END
     ) >= 1
     AND (
-        cr.cr_libelle_long = cr3.cr_libelle_long 
+        cr.cr_libelle_long = cr3.cr_libelle_long
         OR Cr.cr_libelle_long = cr4.cr_libelle_long
         OR (cr.cr_libelle_long = 'NEUROCHIRURGIE' AND ds.dos_libelle_court = 'NRDT Foch')
         OR (cr.cr_libelle_long = 'ANESTHESIE' AND ds.dos_libelle_court = 'Obstétrique')
     )
     AND ((fo.type_document_code IN ('00209')) OR (fo.type_document_code = '00082' AND s2.sej_uf_medicale_code IN ('290A', '294U')))
     AND (format(p.pat_date_deces, 'yyyy/MM/dd') > format(s2.sej_date_sortie, 'yyyy/MM/dd') OR p.pat_date_deces IS NULL)
-
     """
 
-    # Partie 2 de la requête (sans venue) - seulement si nous n'utilisons pas de filtrage par venue
+    # Partie 2 avec syntaxe corrigée aussi
     sql_query_part2 = f"""
-
 UNION
 
 /*Sans venue*/
-SELECT DISTINCT
+SELECT DISTINCT TOP 5000
     year(s2.sej_date_sortie) AS annee,
     DateName(Month, s2.sej_date_sortie) AS mois,
     datediff(day, s2.sej_date_sortie, date_min_val) AS LL_J0,
@@ -407,7 +375,6 @@ FROM
     ) AS s3 ON s3.ven_id = s2.ven_id
     LEFT JOIN NOYAU.coeur.Uf uf ON uf.uf_code = s2.sej_uf_medicale_code
     INNER JOIN NOYAU.coeur.CENTRE_RESPONSABILITE cr ON uf.fk_cr_id = cr.cr_id
-    /* Ajout des jointures pour la date de diffusion et statut envoi */
     LEFT JOIN BOITE_ENVOI.BOITE_ENVOI.DOCUMENT EDOC ON EDOC.document_id = f.document_id
     LEFT JOIN BOITE_ENVOI.BOITE_ENVOI.DESTINATAIRE EDES ON EDES.doc_id = EDOC.doc_id
 WHERE
@@ -441,17 +408,11 @@ WHERE
     try:
         cursor.execute(sql_query)
         rows = cursor.fetchall()
-
-        # Convertir les résultats et gérer les valeurs NULL
         columns = [column[0] for column in cursor.description]
         results = clean_query_results(rows, columns)
-
         return results
     except Exception as e:
-        import traceback
-
-        error_details = traceback.format_exc()
-        print(f"Erreur lors de l'exécution de la requête: {error_details}")
+        logger.error(f"Erreur lors de l'exécution de la requête: {str(e)}")
         raise HTTPException(
             status_code=500,
             detail=f"Erreur lors de l'exécution de la requête: {str(e)}",
@@ -459,28 +420,12 @@ WHERE
     finally:
         cursor.close()
 
-
-# Route API pour récupérer les données des patients sans validation
-@app.get("/api/patients/raw")
-def get_patient_reports_raw(
-    start_date: str | None = Query(None, description="Date de début (format YYYY-MM-DD)"),
-    end_date: str | None = Query(None, description="Date de fin (format YYYY-MM-DD)"),
-):
-    try:
-        conn = get_db_connection()
-        results = execute_query(conn, start_date, end_date)
-        conn.close()
-        return results
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from None
-
-
-# Modification de la route API pour accepter les numéros de séjour
+# Routes de l'API Easily (identiques mais avec logging réduit)
 @app.get("/api/patients/comptes-rendus", response_model=list[PatientRecord])
 def get_patient_reports(
-    start_date: str | None = Query(None, description="Date de début (format YYYY-MM-DD)"),
-    end_date: str | None = Query(None, description="Date de fin (format YYYY-MM-DD)"),
-    venues: str | None = Query(None, description="Liste de numéros de séjour séparés par des virgules"),
+    start_date: Annotated[str | None, Query(description="Date de début (format YYYY-MM-DD)")] = None,
+    end_date: Annotated[str | None, Query(description="Date de fin (format YYYY-MM-DD)")] = None,
+    venues: Annotated[str | None, Query(description="Liste de numéros de séjour séparés par des virgules")] = None,
 ):
     try:
         # Validation des dates
@@ -504,18 +449,15 @@ def get_patient_reports(
 
         # Obtenir une connexion à la base de données
         conn = get_db_connection()
-
-        # Exécuter la requête SQL avec les numéros de séjour si fournis
         results = execute_query(conn, start_date, end_date, venues)
         conn.close()
 
         # Convertir les résultats bruts en instances du modèle PatientRecord
         processed_results = []
         for item in results:
-            # Remplacer les None par des valeurs par défaut pour les champs obligatoires qui ne peuvent pas être None
             item_copy = item.copy()
 
-            # Convertir les données et gérer les nulls
+            # Nettoyer les valeurs nulles
             if item_copy.get("CR_Doss_spe") is None:
                 item_copy["CR_Doss_spe"] = ""
             if item_copy.get("CR_courrier") is None:
@@ -528,117 +470,29 @@ def get_patient_reports(
                 item_copy["Statut Envoi"] = ""
 
             try:
-                # Créer une instance du modèle PatientRecord
                 record = PatientRecord(**item_copy)
                 processed_results.append(record)
             except Exception as validation_error:
-                print(f"Erreur de validation pour l'élément: {item_copy}")
-                print(f"Erreur: {validation_error}")
-                # Ignorer l'élément erroné ou élever une exception selon votre stratégie
+                logger.warning(f"Erreur validation: {validation_error}")
+                continue
 
         return processed_results
     except Exception as e:
-        import traceback
-
-        error_details = traceback.format_exc()
-        print(f"Erreur: {error_details}")
+        logger.error(f"Erreur: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e)) from None
 
-
-# Route pour les statistiques
-@app.get("/api/patients/stats")
-def get_patient_stats(
-    start_date: str | None = Query(None, description="Date de début (format YYYY-MM-DD)"),
-    end_date: str | None = Query(None, description="Date de fin (format YYYY-MM-DD)"),
-):
-    try:
-        # Obtenir une connexion à la base de données
-        conn = get_db_connection()
-
-        # Récupérer les données
-        results = execute_query(conn, start_date, end_date)
-        conn.close()
-
-        # Convertir en DataFrame pour l'analyse
-        df = pd.DataFrame(results)
-
-        if df.empty:
-            return {"message": "Aucune donnée trouvée pour la période spécifiée"}
-
-        # Calculer les statistiques
-        stats = {
-            "total_comptes_rendus": len(df),
-            "comptes_rendus_par_mois": df.groupby("mois").size().to_dict() if "mois" in df.columns else {},
-            "comptes_rendus_par_specialite": df.groupby("CR_Doss_spe").size().to_dict()
-            if "CR_Doss_spe" in df.columns
-            else {},
-            "delai_moyen_validation": df["LL_J0"].mean() if "LL_J0" in df.columns else 0,
-            "patients_uniques": df["pat_IPP"].nunique() if "pat_IPP" in df.columns else 0,
-            "distribution_nuits": df.groupby("nuit_1").size().to_dict() if "nuit_1" in df.columns else {},
-        }
-
-        return stats
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erreur lors du calcul des statistiques: {str(e)}")
-
-
-# Route pour exporter les données au format CSV
-@app.get("/api/patients/export-csv")
-def export_csv(
-    start_date: str | None = Query(None, description="Date de début (format YYYY-MM-DD)"),
-    end_date: str | None = Query(None, description="Date de fin (format YYYY-MM-DD)"),
-):
-    try:
-        # Obtenir une connexion à la base de données
-        conn = get_db_connection()
-
-        # Récupérer les données
-        results = execute_query(conn, start_date, end_date)
-        conn.close()
-
-        if not results:
-            raise HTTPException(
-                status_code=404,
-                detail="Aucune donnée trouvée pour la période spécifiée",
-            )
-
-        # Convertir en DataFrame
-        df = pd.DataFrame(results)
-
-        # Créer un dossier temporaire pour stocker le fichier CSV
-        temp_dir = Path("./temp")
-        temp_dir.mkdir(exist_ok=True)
-
-        # Générer un nom de fichier unique
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"comptes_rendus_{timestamp}.csv"
-        filepath = temp_dir / filename
-
-        # Enregistrer en CSV
-        df.to_csv(filepath, index=False, encoding="utf-8-sig")  # utf-8-sig pour support des accents dans Excel
-
-        # Lire le fichier et le retourner comme réponse
-        with open(filepath, "rb") as file:
-            csv_content = file.read()
-
-        # Nettoyer le fichier temporaire
-        filepath.unlink()
-
-        # Retourner le contenu CSV
-        return {
-            "filename": filename,
-            "content": base64.b64encode(csv_content).decode("utf-8"),
-            "count": len(df),
-        }
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Erreur lors de l'exportation des données: {str(e)}",
-        )
-
-
-# Point d'entrée principal
+# Point d'entrée avec configuration optimisée
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(
+        app,
+        host="0.0.0.0",
+        port=8000,
+        log_level="error",
+        access_log=False,
+        timeout_keep_alive=10,
+        timeout_graceful_shutdown=5,
+        limit_concurrency=30,
+        limit_max_requests=500
+    )

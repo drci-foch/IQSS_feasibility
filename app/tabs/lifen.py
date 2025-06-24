@@ -48,7 +48,7 @@ def display_lifen_data(df_lifen, df_easily):
         return
 
     st.success(
-        f"{len(set(list(df_lifen['num_sej'])))} Lettre(s) de liaison trouvée(s) sur Lifen.")
+        f"{len(set(df_lifen['num_sej']))} Lettre(s) de liaison trouvée(s) sur Lifen.")
 
     # Onglets pour organiser l'affichage des données Lifen
     data_tab, stats_tab, charts_tab = st.tabs(
