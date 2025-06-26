@@ -11,7 +11,7 @@ def display_easily_data(df):
         st.warning("Aucune donnée à afficher.")
         return
 
-    st.success(f"{len(set(df['Num_Venue']))} Lettre de liaison trouvés sur Easily.")
+    st.success(f"{len(set(df['Num_Venue']))} Lettre de liaison(s) trouvés sur Easily.")
 
     # Onglets pour organiser l'affichage des données Easily
     data_tab, stats_tab, charts_tab = st.tabs(
