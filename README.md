@@ -63,7 +63,7 @@ pip install -e .
 1.1 **Variables d'environnement** : Créez un fichier `.env` dans api/easily :
 
 ```env
-DB_CONNECTION_STRING=DRIVER={SQL Server};SERVER={server};DATABASE={database};UID={id};PWD={password}
+DB_CONNECTION_STRING=DRIVER={SQL Server};SERVER={server};DATABASE={database};UID={id};PWD={password};TrustServerCertificate=yes
 ```
 
 1.2 **Variables d'environnement** : Créez un fichier `.env` dans api/lifen :
