@@ -14,9 +14,7 @@ def display_easily_data(df):
     st.success(f"{len(set(df['Num_Venue']))} Lettre de liaison(s) trouvés sur Easily.")
 
     # Onglets pour organiser l'affichage des données Easily
-    data_tab, stats_tab, charts_tab = st.tabs(
-        ["Tableau de données", "Statistiques", "Graphiques"]
-    )
+    data_tab, stats_tab, charts_tab = st.tabs(["Tableau de données", "Statistiques", "Graphiques"])
 
     with data_tab:
         st.dataframe(df, use_container_width=True)
@@ -33,7 +31,7 @@ def display_easily_data(df):
         col1, col2, col3 = st.columns(3)
 
         with col1:
-            st.metric("Nombre total de Lettre de liaison", len(set(df['Num_Venue'])))
+            st.metric("Nombre total de Lettre de liaison", len(set(df["Num_Venue"])))
 
         with col2:
             if "pat_IPP" in df.columns:
@@ -42,9 +40,10 @@ def display_easily_data(df):
         with col3:
             if "LL_J0" in df.columns:
                 delay = df["LL_J0"].mean()
-                st.metric("Délai moyen entre la sortie d'hospitalisation et la validation du " \
-                "document de liaison (jours)",
-                          f"{delay:.1f}")
+                st.metric(
+                    "Délai moyen entre la sortie d'hospitalisation et la validation du document de liaison (jours)",
+                    f"{delay:.1f}",
+                )
 
         # Distribution par spécialité
         if "CR_Doss_spe" in df.columns:
@@ -126,9 +125,7 @@ def get_easily_data(start_date, end_date, venue_numbers=None):
         if response.status_code == 200:
             return response.json()
         else:
-            st.error(
-                f"Erreur lors de la récupération des données Easily: {response.status_code} - {response.text}"
-            )
+            st.error(f"Erreur lors de la récupération des données Easily: {response.status_code} - {response.text}")
             return []
     except Exception as e:
         st.error(f"Erreur de connexion à l'API Easily: {str(e)}")

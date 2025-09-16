@@ -10,22 +10,23 @@ def create_download_link(df, filename):
     df_clean = df.copy()
 
     # For string columns only, clean up carriage returns
-    for col in df_clean.select_dtypes(include=['object']).columns:
-        if df_clean[col].dtype == 'object':  # Only process string columns
-            df_clean[col] = df_clean[col].astype(str).str.replace('\r', '')
+    for col in df_clean.select_dtypes(include=["object"]).columns:
+        if df_clean[col].dtype == "object":  # Only process string columns
+            df_clean[col] = df_clean[col].astype(str).str.replace("\r", "")
 
     # Use explicit line terminator and quoting parameters
     csv = df_clean.to_csv(
         index=False,
-        lineterminator='\n',      # Ensure consistent line endings
-        quoting=1,                 # csv.QUOTE_ALL - quote all fields
-        quotechar='"',             # Use double quotes
-        escapechar='\\'            # Use backslash as escape character
+        lineterminator="\n",  # Ensure consistent line endings
+        quoting=1,  # csv.QUOTE_ALL - quote all fields
+        quotechar='"',  # Use double quotes
+        escapechar="\\",  # Use backslash as escape character
     )
 
-    b64 = base64.b64encode(csv.encode('utf-8')).decode('utf-8')
+    b64 = base64.b64encode(csv.encode("utf-8")).decode("utf-8")
     href = f'<a href="data:file/csv;base64,{b64}" download="{filename}" class="highlight">Télécharger {filename}</a>'
     return href
+
 
 def import_venue_numbers(uploaded_file):
     """
@@ -76,9 +77,7 @@ def import_venue_numbers(uploaded_file):
 
             # Vérifier si l'une des colonnes possibles existe dans le dataframe
             found_columns = [
-                col
-                for col in df.columns
-                if col.lower() in [name.lower() for name in possible_column_names]
+                col for col in df.columns if col.lower() in [name.lower() for name in possible_column_names]
             ]
 
             if found_columns:

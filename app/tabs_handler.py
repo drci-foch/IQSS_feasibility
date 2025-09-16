@@ -12,27 +12,22 @@ def render_initial_tabs():
 
     with easily_tab:
         st.info(
-            "Utilisez la barre latérale pour configurer votre requête, puis cliquez sur 'Exécuter la Requête' " \
+            "Utilisez la barre latérale pour configurer votre requête, puis cliquez sur 'Exécuter la Requête' "
             "pour voir les résultats."
         )
 
     with lifen_tab:
-        st.info(
-            "Les données Lifen seront affichées après l'exécution de la requête Easily."
-        )
+        st.info("Les données Lifen seront affichées après l'exécution de la requête Easily.")
 
     with analyse_tab:
-        st.info(
-            "L'analyse des délais sera disponible après l'exécution de la requête."
-        )
+        st.info("L'analyse des délais sera disponible après l'exécution de la requête.")
 
     return easily_tab, lifen_tab, analyse_tab
 
+
 def display_tabs_content(df_easily, df_lifen):
     """Display content in each tab based on available data"""
-    easily_tab, lifen_tab, analyse_tab = st.tabs(
-        ["Source Easily", "Source Lifen", "Comparaison Easily/Lifen"]
-    )
+    easily_tab, lifen_tab, analyse_tab = st.tabs(["Source Easily", "Source Lifen", "Comparaison Easily/Lifen"])
 
     with easily_tab:
         display_easily_data(df_easily)
@@ -41,18 +36,13 @@ def display_tabs_content(df_easily, df_lifen):
         if df_lifen is not None:
             display_lifen_data(df_lifen, df_easily)
         else:
-            st.warning(
-                "Aucune donnée Lifen disponible pour les numéros de séjour sélectionnés."
-            )
+            st.warning("Aucune donnée Lifen disponible pour les numéros de séjour sélectionnés.")
 
     with analyse_tab:
         if df_lifen is not None:
             display_analyse_documents(df_lifen, df_easily)
         else:
-            st.warning(
-                "Aucune donnée Lifen disponible pour analyser les délais."
-            )
-
+            st.warning("Aucune donnée Lifen disponible pour analyser les délais.")
 
     # Ajouter le bouton de téléchargement des numéros manquants si disponibles
     if "missing_venues_both" in st.session_state and st.session_state.missing_venues_both:

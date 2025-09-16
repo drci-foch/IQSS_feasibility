@@ -9,11 +9,7 @@ def render_sidebar():
     st.markdown("<h2 class='sub-header'>Paramètres de Requête</h2>", unsafe_allow_html=True)
 
     # Add option to choose between date query and venue import
-    query_type = st.radio(
-        "Mode de requête",
-        ["Par date", "Par numéros de séjour"],
-        key="query_type"
-    )
+    query_type = st.radio("Mode de requête", ["Par date", "Par numéros de séjour"], key="sidebar_query_type")
 
     # Variables to store filter values
     start_date = None
@@ -32,9 +28,18 @@ def render_sidebar():
 
     # Bouton de requête
     st.markdown("<br>", unsafe_allow_html=True)
-    run_query = st.button("Exécuter la Requête", type="primary", use_container_width=True)
+    run_query = st.button("Exécuter la Requête", type="primary", use_container_width=True, key="sidebar_run_query")
 
-    return query_type, start_date, end_date, imported_venues, filter_specialite, filter_result, filter_channel, run_query
+    return (
+        query_type,
+        start_date,
+        end_date,
+        imported_venues,
+        filter_specialite,
+        filter_result,
+        filter_channel,
+        run_query,
+    )
 
 
 def setup_date_filters():
@@ -146,9 +151,7 @@ def setup_advanced_filters():
 
         # Filtres pour Lifen
         st.subheader("Filtres Lifen")
-        filter_result = st.multiselect(
-            "Filtrer par résultat", ["Réussite", "Échec"], key="filter_by_result"
-        )
+        filter_result = st.multiselect("Filtrer par résultat", ["Réussite", "Échec"], key="filter_by_result")
         filter_channel = st.multiselect(
             "Filtrer par canal", ["DMP", "MSSANTE", "APICRYPT", "MAIL", "PAPIER"], key="filter_by_channel"
         )

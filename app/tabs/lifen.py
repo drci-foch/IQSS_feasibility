@@ -32,9 +32,7 @@ def get_lifen_data(num_venues, start_date=None, end_date=None):
         if response.status_code == 200:
             return response.json()
         else:
-            st.error(
-                f"Erreur lors de la récupération des données Lifen: {response.status_code} - {response.text}"
-            )
+            st.error(f"Erreur lors de la récupération des données Lifen: {response.status_code} - {response.text}")
             return []
     except Exception as e:
         st.error(f"Erreur de connexion à l'API Lifen: {str(e)}")
@@ -47,13 +45,10 @@ def display_lifen_data(df_lifen, df_easily):
         st.warning("Aucune donnée Lifen à afficher.")
         return
 
-    st.success(
-        f"{len(set(df_lifen['num_sej']))} Lettre(s) de liaison trouvée(s) sur Lifen.")
+    st.success(f"{len(set(df_lifen['num_sej']))} Lettre(s) de liaison trouvée(s) sur Lifen.")
 
     # Onglets pour organiser l'affichage des données Lifen
-    data_tab, stats_tab, charts_tab = st.tabs(
-        ["Tableau de données", "Statistiques", "Graphiques"]
-    )
+    data_tab, stats_tab, charts_tab = st.tabs(["Tableau de données", "Statistiques", "Graphiques"])
 
     with data_tab:
         st.dataframe(df_lifen, use_container_width=True)
@@ -74,20 +69,12 @@ def display_lifen_data(df_lifen, df_easily):
 
         with col2:
             if "statut_envoi" in df_lifen.columns:
-                success_rate = (
-                    df_lifen[df_lifen["statut_envoi"] == "Réussite"].shape[0]
-                    / len(df_lifen)
-                    * 100
-                )
+                success_rate = df_lifen[df_lifen["statut_envoi"] == "Réussite"].shape[0] / len(df_lifen) * 100
                 st.metric("Taux de réussite", f"{success_rate:.1f}%")
 
         with col3:
             if "num_sej" in df_lifen.columns and "Num_Venue" in df_easily.columns:
-                coverage = (
-                    df_lifen["num_sej"].nunique()
-                    / df_easily["Num_Venue"].nunique()
-                    * 100
-                )
+                coverage = df_lifen["num_sej"].nunique() / df_easily["Num_Venue"].nunique() * 100
                 st.metric("Couverture des séjours", f"{coverage:.1f}%")
 
         # Distribution par canal
@@ -107,9 +94,7 @@ def display_lifen_data(df_lifen, df_easily):
         # Distribution par type de destinataire
         if "role_destinataire" in df_lifen.columns:
             st.subheader("Distribution par type de destinataire")
-            recipient_counts = (
-                df_lifen["role_destinataire"].value_counts().reset_index()
-            )
+            recipient_counts = df_lifen["role_destinataire"].value_counts().reset_index()
             recipient_counts.columns = ["Type de destinataire", "Nombre"]
             st.dataframe(recipient_counts, use_container_width=True)
 
@@ -135,28 +120,15 @@ def display_lifen_data(df_lifen, df_easily):
             st.plotly_chart(fig2, use_container_width=True)
 
         # Graphique croisé spécialité vs canal (si les deux dataframes peuvent être liés)
-        if (
-            "num_sej" in df_lifen.columns
-            and "Num_Venue" in df_easily.columns
-            and "CR_Doss_spe" in df_easily.columns
-        ):
+        if "num_sej" in df_lifen.columns and "Num_Venue" in df_easily.columns and "CR_Doss_spe" in df_easily.columns:
             st.subheader("Canaux par spécialité")
             # Créer un DataFrame enrichi pour ce graphique spécifique
-            df_easily_slim = df_easily[["Num_Venue", "CR_Doss_spe"]].rename(
-                columns={"Num_Venue": "num_sej"}
-            )
+            df_easily_slim = df_easily[["Num_Venue", "CR_Doss_spe"]].rename(columns={"Num_Venue": "num_sej"})
             df_enriched = pd.merge(df_lifen, df_easily_slim, on="num_sej", how="left")
 
             # Créer un graphique à barres empilées
-            if (
-                "canal_envoi" in df_enriched.columns
-                and "CR_Doss_spe" in df_enriched.columns
-            ):
-                cross_counts = (
-                    df_enriched.groupby(["CR_Doss_spe", "canal_envoi"])
-                    .size()
-                    .reset_index(name="count")
-                )
+            if "canal_envoi" in df_enriched.columns and "CR_Doss_spe" in df_enriched.columns:
+                cross_counts = df_enriched.groupby(["CR_Doss_spe", "canal_envoi"]).size().reset_index(name="count")
                 fig3 = px.bar(
                     cross_counts,
                     x="CR_Doss_spe",

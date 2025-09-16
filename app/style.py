@@ -1,4 +1,4 @@
-custom_css =  """
+custom_css = """
     <style>
     :root {
         --primary-color: #047dc1;
@@ -57,4 +57,3 @@ custom_css =  """
     }
     </style>
     """
-

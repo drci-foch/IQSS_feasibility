@@ -76,7 +76,7 @@ def get_db_connection():
     try:
         connection_string = os.getenv(
             "DB_CONNECTION_STRING",
-            "DRIVER={SQL Server};SERVER=your_server;DATABASE=your_db;UID=your_username;PWD=your_password;TrustServerCertificate=yes"",
+            "DRIVER={SQL Server};SERVER=your_server;DATABASE=your_db;UID=your_username;PWD=your_password;TrustServerCertificate=yes",
         )
         # Ajouter timeout de connexion
         conn = pyodbc.connect(connection_string, timeout=15)

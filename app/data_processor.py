@@ -4,7 +4,15 @@ from tabs.easily import get_easily_data
 from tabs.lifen import get_lifen_data
 
 
-def process_data(query_type=None, start_date=None, end_date=None, imported_venues=None, filter_specialite=None, filter_result=None, filter_channel=None):
+def process_data(
+    query_type=None,
+    start_date=None,
+    end_date=None,
+    imported_venues=None,
+    filter_specialite=None,
+    filter_result=None,
+    filter_channel=None,
+):
     """Process data from APIs and apply filters based on query type"""
     with st.spinner("Récupération des données..."):
         # Determine query mode
@@ -23,11 +31,7 @@ def process_data(query_type=None, start_date=None, end_date=None, imported_venue
                 return None, None
 
             # Récupérer les données Easily en mode venue uniquement
-            easily_data = get_easily_data(
-                start_date=None,
-                end_date=None,
-                venue_numbers=imported_venues
-            )
+            easily_data = get_easily_data(start_date=None, end_date=None, venue_numbers=imported_venues)
 
             # Pour une requête par numéro de séjour, utiliser directement les numéros importés
             num_venues = imported_venues
@@ -71,7 +75,9 @@ def process_data(query_type=None, start_date=None, end_date=None, imported_venue
             st.session_state.missing_venues_both = sorted(missing_venues_both)
 
             if missing_venues_both:
-                st.info(f"{len(missing_venues_both)} numéro(s) de séjour n'a/n'ont pas été retrouvés dans Easily ou Lifen.")
+                st.info(
+                    f"{len(missing_venues_both)} numéro(s) de séjour n'a/n'ont pas été retrouvés dans Easily ou Lifen."
+                )
 
         else:
             # Pour les requêtes par date, utiliser les dates sélectionnées
@@ -83,9 +89,8 @@ def process_data(query_type=None, start_date=None, end_date=None, imported_venue
             easily_data = get_easily_data(
                 start_date=start_date,
                 end_date=end_date,
-                venue_numbers=[]  # Liste vide pour les requêtes par date
+                venue_numbers=[],  # Liste vide pour les requêtes par date
             )
-
 
         if not easily_data:
             message = "Aucune donnée Easily n'a été retournée."
@@ -104,9 +109,7 @@ def process_data(query_type=None, start_date=None, end_date=None, imported_venue
 
         # Appliquer les filtres Easily
         if filter_specialite:
-            df_easily = df_easily[
-                df_easily["CR_Doss_spe"].isin(filter_specialite)
-            ]
+            df_easily = df_easily[df_easily["CR_Doss_spe"].isin(filter_specialite)]
 
         # MODIFICATION ICI: Déterminer quels numéros de séjour utiliser pour Lifen
         if is_venue_query:
@@ -118,11 +121,7 @@ def process_data(query_type=None, start_date=None, end_date=None, imported_venue
             lifen_data = get_lifen_data(num_venues, None, None)
         else:
             # Pour une requête par date, extraire les numéros de séjour depuis la réponse Easily
-            num_venues = (
-                df_easily["Num_Venue"].tolist()
-                if "Num_Venue" in df_easily.columns
-                else []
-            )
+            num_venues = df_easily["Num_Venue"].tolist() if "Num_Venue" in df_easily.columns else []
 
             # Récupérer les données Lifen avec les dates et les numéros extraits d'Easily
             lifen_data = get_lifen_data(num_venues, start_date, end_date)
@@ -135,13 +134,9 @@ def process_data(query_type=None, start_date=None, end_date=None, imported_venue
             df_lifen = pd.DataFrame(lifen_data)
             # Appliquer les filtres Lifen
             if filter_result and "statut_envoi" in df_lifen.columns:
-                df_lifen = df_lifen[
-                    df_lifen["statut_envoi"].isin(filter_result)
-                ]
+                df_lifen = df_lifen[df_lifen["statut_envoi"].isin(filter_result)]
             if filter_channel and "canal_envoi" in df_lifen.columns:
-                df_lifen = df_lifen[
-                    df_lifen["canal_envoi"].isin(filter_channel)
-                ]
+                df_lifen = df_lifen[df_lifen["canal_envoi"].isin(filter_channel)]
         else:
             df_lifen = None
 
