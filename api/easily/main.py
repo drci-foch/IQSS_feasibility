@@ -6,9 +6,21 @@ from typing import Annotated
 
 import pyodbc
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Depends, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, validator
+import sys
+sys.path.append(os.path.abspath('..'))  # Chemin vers le dossier contenant auth.py
+from auth import create_access_token, get_current_user, UserInfo, ADMIN_USERS, verify_password
+from fastapi import Form
+from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
+from datetime import timedelta
+from auth import record_user_login
+import uuid
+
+# Créer un identifiant unique pour chaque session utilisateur
+session_id = str(uuid.uuid4())
+
 
 # Configuration logging plus légère
 logging.basicConfig(level=logging.WARNING)
@@ -421,11 +433,12 @@ WHERE
         cursor.close()
 
 # Routes de l'API Easily (identiques mais avec logging réduit)
-@app.get("/api/patients/comptes-rendus", response_model=list[PatientRecord])
+@app.get("/api/patients/comptes-rendus", response_model=list[PatientRecord] )
 def get_patient_reports(
     start_date: Annotated[str | None, Query(description="Date de début (format YYYY-MM-DD)")] = None,
     end_date: Annotated[str | None, Query(description="Date de fin (format YYYY-MM-DD)")] = None,
     venues: Annotated[str | None, Query(description="Liste de numéros de séjour séparés par des virgules")] = None,
+    current_user: str = Depends(get_current_user)
 ):
     try:
         # Validation des dates
@@ -480,6 +493,40 @@ def get_patient_reports(
     except Exception as e:
         logger.error(f"Erreur: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e)) from None
+    
+
+# Route de connexion pour obtenir le token
+@app.post("/token")
+def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
+    if form_data.username not in ADMIN_USERS:
+        print("Invalid username attempt:", form_data.username)
+        raise HTTPException(status_code=401, detail="Invalid username")
+    hashed_pw = ADMIN_USERS[form_data.username]
+    if not verify_password(form_data.password, hashed_pw):
+        print("Invalid username attempt:", form_data.password)
+        raise HTTPException(status_code=401, detail="Invalid password")
+    access_token_expires = timedelta(minutes=180)  # Token valide 3 heures
+    access_token = create_access_token(
+        data={"sub": form_data.username}, expires_delta=access_token_expires
+    )
+    record_user_login(form_data.username)
+    return {"access_token": access_token, "token_type": "bearer"}
+
+# Route pour récupérer les informations de l'utilisateur connecté
+@app.get("/me")
+def get_me(user_info: UserInfo = Depends(get_current_user)):
+    return {
+        "username": user_info.username,
+        "expires_at": user_info.expires_at.isoformat(),
+        "remaining_seconds": int((user_info.expires_at - datetime.utcnow()).total_seconds()),
+        "roles": user_info.roles
+    }
+
+@app.post("/logout")
+def logout(response: Response, current_user: str = Depends(get_current_user)):
+    response.delete_cookie(key="access_token", path="/")
+    return {"message": "Logout successful"}
+
 
 # Point d'entrée avec configuration optimisée
 if __name__ == "__main__":

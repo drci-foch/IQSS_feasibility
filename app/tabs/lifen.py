@@ -4,6 +4,7 @@ import requests
 import streamlit as st
 from app_conf import LIFEN_API_URL
 from utils import create_download_link
+from auth import api_request
 
 
 # Fonction pour récupérer les données Lifen pour les numéros de séjour spécifiés
@@ -27,7 +28,8 @@ def get_lifen_data(num_venues, start_date=None, end_date=None):
             params["end_date"] = end_date.strftime("%Y-%m-%d")
 
         # Appeler l'API Lifen avec les paramètres
-        response = requests.get(LIFEN_API_URL, params=params)
+        #response = requests.get(LIFEN_API_URL, params=params)
+        response = api_request("GET", LIFEN_API_URL, params=params)
 
         if response.status_code == 200:
             return response.json()

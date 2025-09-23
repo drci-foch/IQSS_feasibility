@@ -2,19 +2,13 @@ import hashlib
 import time
 from datetime import datetime, timedelta
 from typing import Optional, Dict, List
+import requests
+from app_conf import AUTH_LOGIN_API_URL, AUTH_VALIDATE_API_URL, DECONNEXION_API_URL
+import jwt
+import streamlit.components.v1 as components
 
 import streamlit as st
-
-# ===== CONFIGURATION INTÉGRÉE =====
-# Utilisateurs autorisés (format: "username": "sha256_hash_of_password")
-AUTHORIZED_USERS = {
-    "admin": "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9",  # password: admin123
-}
-
-# Rôles et permissions
-USER_ROLES = {
-    "admin": ["full_access", "easily", "lifen", "analysis"],
-}
+session = requests.Session()
 
 # Configuration de session
 SESSION_DURATION = timedelta(hours=3)
@@ -36,41 +30,61 @@ def hash_password(password: str) -> str:
     """Hache un mot de passe avec SHA-256"""
     return hashlib.sha256(password.encode()).hexdigest()
 
-
-def check_password(username: str, password: str) -> bool:
-    """Vérifie si le mot de passe est correct pour l'utilisateur donné"""
-    if username not in AUTHORIZED_USERS:
-        return False
-    return AUTHORIZED_USERS[username] == hash_password(password)
-
-
-def get_user_permissions(username: str) -> list:
-    """Retourne les permissions de l'utilisateur"""
-    return USER_ROLES.get(username, [])
-
-
-def is_session_valid() -> bool:
-    """Vérifie si la session est valide et non expirée"""
-    if "authenticated" not in st.session_state:
-        return False
-
-    if "login_time" not in st.session_state:
-        return False
-
-    # Utiliser la durée de session configurée
-    if datetime.now() - st.session_state.login_time > SESSION_DURATION:
-        return False
-
-    return st.session_state.authenticated
+def logout_storage():
+    components.html("""
+    <script>
+        localStorage.removeItem("access_token");
+        window.parent.location.reload();
+    </script>
+    """, height=0)
+    st.stop()
 
 
 def logout():
     """Déconnecte l'utilisateur"""
-    for key in list(st.session_state.keys()):
-        if key.startswith(("authenticated", "username", "user_permissions", "login_time")):
-            del st.session_state[key]
-    st.rerun()
+    api_request("POST", DECONNEXION_API_URL)
+    logout_storage()
 
+def api_request(method, url, **kwargs):
+
+    token = st.session_state.get("access_token")
+   
+    response = requests.request(method, url, headers={"Authorization": f"Bearer {token}"}, **kwargs)
+    if response.status_code == 401:
+        st.warning("🚫 Accès non autorisé (401).")
+        logout_storage()
+        return None
+
+    return response
+
+def is_logged_in():
+    token = st.session_state.get("access_token")
+    headers = {
+        "Authorization": f"Bearer {token}"
+    }
+    response = requests.get(AUTH_VALIDATE_API_URL, headers=headers)
+
+    print(response.status_code)
+    print('iciii')
+    if response.status_code == 200:
+        print(response.json())
+        st.session_state.username = response.json().get("username")
+        st.session_state.authenticated = True
+        st.session_state.user_permissions = response.json().get("roles", [])
+        st.session_state.login_time = response.json().get("remaining_seconds")
+        return True
+    else:
+        st.session_state.username = None
+    return False
+
+def store_token(token):
+    import streamlit.components.v1 as components
+    components.html(f"""
+    <script>
+        localStorage.setItem("access_token", "{token}");
+        window.parent.location.reload();
+    </script>
+    """, height=0)
 
 def get_css_styles() -> str:
     """Retourne les styles CSS corrigés pour garder le contenu dans la bulle"""
@@ -130,7 +144,7 @@ def get_css_styles() -> str:
             letter-spacing: -0.5px;
             line-height: 1;
         }
-        
+
         /* Barre de gradient en haut */
         .login-container::before {
             content: '';
@@ -435,7 +449,19 @@ def render_login_page() -> None:
 
     # Injection des styles CSS
     st.markdown(get_css_styles(), unsafe_allow_html=True)
-
+    if st.session_state.get("username") == None:
+        st.markdown(
+            """
+            <style>
+            .st-emotion-cache-zy6yx3 {
+                width: 35% !important;
+                max-width: 35% !important;
+            }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
+    
     # Conteneur principal - TOUT doit être à l'intérieur
     # En-tête - DANS le container
     st.markdown(
@@ -473,35 +499,18 @@ def render_login_page() -> None:
     # Traitement de la connexion avec feedback amélioré - DANS le container
     if login_button:
         if username and password:
-            # Simulation d'un petit délai pour le feedback visuel
-            with st.spinner("Vérification des identifiants..."):
-                time.sleep(0.5)  # Petit délai pour l'UX
+            data = {"username": username, "password": password}
+            response = requests.post(f"{AUTH_LOGIN_API_URL}", data=data)
 
-            if check_password(username, password):
-                # Connexion réussie
-                st.session_state.authenticated = True
-                st.session_state.username = username
-                st.session_state.user_permissions = get_user_permissions(username)
-                st.session_state.login_time = datetime.now()
-
-                st.success(AUTH_MESSAGES["login_success"].format(username=username))
-
-                # Affichage des permissions accordées
-                permissions = get_user_permissions(username)
-                if permissions:
-                    permission_names = {
-                        "full_access": "Administration complète",
-                        "easily": "Données Easily",
-                        "lifen": "Données Lifen",
-                        "analysis": "Analyses avancées",
-                    }
-                    perm_list = [permission_names.get(p, p) for p in permissions]
-                    st.info(f"🔐 **Accès autorisés :** {', '.join(perm_list)}")
-
-                time.sleep(2)
-                st.rerun()
+            if response.status_code == 200:
+                st.success("Connexion réussie ! 🎉")
+                store_token(response.json()["access_token"])
+            elif response.status_code == 401:
+                st.error("Utilisateur ou mot de passe invalide.")
+                st.session_state.token = None  # Réinitialiser la session
             else:
-                st.error(AUTH_MESSAGES["login_failed"])
+                st.error(f"Erreur de connexion au service d'authentification: {response.text}")
+
         else:
             st.warning("⚠️ Veuillez remplir tous les champs")
 
@@ -530,7 +539,6 @@ def render_user_info():
     """Affiche les informations de l'utilisateur connecté dans la sidebar avec design amélioré"""
     if "username" in st.session_state:
         st.sidebar.markdown(get_css_styles(), unsafe_allow_html=True)
-
         # Container avec style amélioré
         st.sidebar.markdown(
             f"""
@@ -547,31 +555,28 @@ def render_user_info():
 
         # Informations de session améliorées
         if "login_time" in st.session_state:
-            session_time = datetime.now() - st.session_state.login_time
-            hours = int(session_time.total_seconds() // 3600)
-            minutes = int((session_time.total_seconds() % 3600) // 60)
+            session_time = st.session_state.login_time
 
-            # Calcul du temps restant
-            time_left = SESSION_DURATION - session_time
-            if time_left.total_seconds() > 0:
-                hours_left = int(time_left.total_seconds() // 3600)
-                minutes_left = int((time_left.total_seconds() % 3600) // 60)
+            # Ensure session_time is a timedelta object
+            if isinstance(session_time, int):
+                session_time = timedelta(seconds=session_time)
 
-                session_status = "🟢 Active"
-                if hours_left < 1:
-                    session_status = "🟡 Expire bientôt"
+            hours_left = int(session_time.total_seconds() // 3600)
+            minutes_left = int((session_time.total_seconds() % 3600) // 60)
 
-                st.sidebar.markdown(
-                    f"""
-                    <div class="session-info">
-                        <strong>{session_status}</strong><br>
-                        ⏰ Reste: {hours_left}h {minutes_left}m
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
-            else:
-                st.sidebar.error("🔴 Session expirée")
+            session_status = "🟢 Active"
+            if hours_left < 1:
+                session_status = "🟡 Expire bientôt"
+
+            st.sidebar.markdown(
+                f"""
+                <div class="session-info">
+                    <strong>{session_status}</strong><br>
+                    ⏰ Reste: {hours_left}h {minutes_left}m
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
 
         st.sidebar.markdown("<br>", unsafe_allow_html=True)
 
@@ -582,26 +587,8 @@ def render_user_info():
 
 def check_permission(required_permission: str) -> bool:
     """Vérifie si l'utilisateur a la permission requise"""
-    if not is_session_valid():
-        return False
-
     user_permissions = st.session_state.get("user_permissions", [])
     return required_permission in user_permissions or "full_access" in user_permissions
-
-
-def require_auth():
-    """Décorateur pour protéger une fonction avec authentification"""
-
-    def decorator(func):
-        def wrapper(*args, **kwargs):
-            if not is_session_valid():
-                render_login_page()
-                return None
-            return func(*args, **kwargs)
-
-        return wrapper
-
-    return decorator
 
 
 def show_permission_denied(required_permission: str):

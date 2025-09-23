@@ -172,3 +172,11 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+#for production
+requirements_packages/
+requirements.txt
+hashage_password.py
+
+# Logs
+User_connections.log

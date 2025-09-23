@@ -3,6 +3,7 @@ import requests
 import streamlit as st
 from app_conf import EASILY_API_URL
 from utils import create_download_link
+from auth import api_request
 
 
 # Fonction pour afficher les données Easily
@@ -118,9 +119,10 @@ def get_easily_data(start_date, end_date, venue_numbers=None):
             # Si aucun mode de requête valide n'est disponible
             st.error("Veuillez fournir soit des numéros de séjour, soit des dates de début et de fin valides.")
             return []
-
+        
         # Appeler l'API avec les paramètres
-        response = requests.get(EASILY_API_URL, params=params)
+        #response = requests.get(EASILY_API_URL, params=params)
+        response = api_request("GET", EASILY_API_URL, params=params)
 
         if response.status_code == 200:
             return response.json()

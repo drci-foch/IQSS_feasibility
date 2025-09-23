@@ -2,12 +2,14 @@ import pandas as pd
 import streamlit as st
 
 # Import du module d'authentification
-from auth import check_permission, is_session_valid, render_login_page, render_user_info
+from auth import check_permission, render_login_page, render_user_info, is_logged_in
 from data_processor import process_data
 
 # Import modular components
 from sidebar import render_sidebar
 from style import custom_css
+from streamlit_javascript import st_javascript
+import time
 
 st.set_page_config(
     page_title="SEQUAD - Système d'Authentification",
@@ -21,10 +23,16 @@ st.markdown(custom_css, unsafe_allow_html=True)
 
 def main():
     # Vérifier l'authentification
-    if not is_session_valid():
+    # Lire le token injecté
+    token = st_javascript("""(() => {
+        return window.localStorage.getItem('access_token');
+    })()""")
+    st.session_state['access_token'] = token
+    if not is_logged_in():
         render_login_page()
         return
 
+    print('ici')
     # Afficher les informations utilisateur dans la sidebar
     render_user_info()
 

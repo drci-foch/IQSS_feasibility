@@ -10,10 +10,13 @@ from typing import Annotated
 import oracledb
 import requests
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import FastAPI, HTTPException, Query, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from starlette.middleware.base import BaseHTTPMiddleware
+import sys
+sys.path.append(os.path.abspath('..'))  # Chemin vers le dossier contenant auth.py
+from auth import get_current_user
 
 # Configure logging avec niveau réduit pour éviter le spam
 logging.basicConfig(
@@ -473,6 +476,7 @@ async def get_lifen_data(
     start_date: Annotated[str | None, Query(description="Date début (YYYY-MM-DD)")] = None,
     end_date: Annotated[str | None, Query(description="Date fin (YYYY-MM-DD)")] = None,
     use_easily_api: Annotated[bool, Query(description="Utiliser l'API Easily")] = True,
+    current_user: str = Depends(get_current_user)
 ):
     start_time = time.time()
     request_id = f"{int(time.time())}"
@@ -578,7 +582,8 @@ async def health_check():
 @app.get("/api/lifen/metadata")
 def get_period_metadata(
     start_date: Annotated[str, Query(description="Date début (YYYY-MM-DD)")] = ...,
-    end_date: Annotated[str, Query(description="Date fin (YYYY-MM-DD)")] = ...
+    end_date: Annotated[str, Query(description="Date fin (YYYY-MM-DD)")] = ...,
+    current_user: str = Depends(get_current_user)
 ):
     try:
         duration = (datetime.strptime(end_date, '%Y-%m-%d') -
@@ -603,6 +608,7 @@ def get_period_metadata(
         }
     except Exception as e:
         raise HTTPException(400, f"Format de date invalide: {str(e)}")
+
 
 # Point d'entrée avec configuration uvicorn optimisée
 if __name__ == "__main__":
