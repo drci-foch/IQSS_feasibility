@@ -279,19 +279,7 @@ def get_css_styles() -> str:
             box-shadow: var(--shadow-medium) !important;
             background: linear-gradient(135deg, var(--primary-blue-dark) 0%, #003366 100%) !important;
         }
-            
-        .centered-button-container {
-            display: flex;
-            justify-content: center;
-            margin: 1rem 0;
-        }
 
-        .centered-button-container .stButton > button {
-            width: auto !important;
-            min-width: 200px;
-            padding: 0.75rem 2rem !important;
-            text-align: center;
-        }
 
         /* Messages d'état */
         .stAlert {
