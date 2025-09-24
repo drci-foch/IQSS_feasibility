@@ -12,7 +12,7 @@ def display_easily_data(df):
         st.warning("Aucune donnée à afficher.")
         return
 
-    st.success(f"{len(set(df['Num_Venue']))} Lettre de liaison(s) trouvés sur Easily.")
+    st.success(f"{len(set(df['Num_Venue']))} Lettres de liaison(s) trouvées sur Easily.")
 
     # Onglets pour organiser l'affichage des données Easily
     data_tab, stats_tab, charts_tab = st.tabs(["Tableau de données", "Statistiques", "Graphiques"])
@@ -119,9 +119,8 @@ def get_easily_data(start_date, end_date, venue_numbers=None):
             # Si aucun mode de requête valide n'est disponible
             st.error("Veuillez fournir soit des numéros de séjour, soit des dates de début et de fin valides.")
             return []
-        
+
         # Appeler l'API avec les paramètres
-        #response = requests.get(EASILY_API_URL, params=params)
         response = api_request("GET", EASILY_API_URL, params=params)
 
         if response.status_code == 200:

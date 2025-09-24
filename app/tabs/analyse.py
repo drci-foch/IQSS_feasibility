@@ -6,7 +6,7 @@ import streamlit as st
 
 
 def display_analyse_documents(df_lifen, df_easily):
-    st.header("📊 Analyse des délais entre validation, sortie et envoi")
+    st.header("📊 Analyse des délais entre validation, sortie et envoi des lettres de liaison")
 
     # Encadré d'introduction avec icône
     st.info("💡 **Objectif** : Évaluer les délais de transmission des lettres de liaison aux patients")
@@ -18,7 +18,7 @@ def display_analyse_documents(df_lifen, df_easily):
 
     with col1:
         st.markdown("""
-        **🌐 Délai global**
+        **🌐 Délai de transmission des LL par rapport à la sortie du patient**
 
         Temps entre la sortie patient (Easily) et l'envoi document (Lifen)
         """)
@@ -32,7 +32,7 @@ def display_analyse_documents(df_lifen, df_easily):
 
     with col3:
         st.markdown("""
-        **⏱️ Délai validation**
+        **⏱️ Délai de transmission des LL par rapport à leur validation**
 
         Temps entre validation médicale et envoi effectif
         """)

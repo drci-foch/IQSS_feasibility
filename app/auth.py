@@ -8,6 +8,7 @@ import jwt
 import streamlit.components.v1 as components
 
 import streamlit as st
+
 session = requests.Session()
 
 # Configuration de session
@@ -30,13 +31,17 @@ def hash_password(password: str) -> str:
     """Hache un mot de passe avec SHA-256"""
     return hashlib.sha256(password.encode()).hexdigest()
 
+
 def logout_storage():
-    components.html("""
+    components.html(
+        """
     <script>
         localStorage.removeItem("access_token");
         window.parent.location.reload();
     </script>
-    """, height=0)
+    """,
+        height=0,
+    )
     st.stop()
 
 
@@ -45,10 +50,10 @@ def logout():
     api_request("POST", DECONNEXION_API_URL)
     logout_storage()
 
-def api_request(method, url, **kwargs):
 
+def api_request(method, url, **kwargs):
     token = st.session_state.get("access_token")
-   
+
     response = requests.request(method, url, headers={"Authorization": f"Bearer {token}"}, **kwargs)
     if response.status_code == 401:
         st.warning("🚫 Accès non autorisé (401).")
@@ -57,15 +62,14 @@ def api_request(method, url, **kwargs):
 
     return response
 
+
 def is_logged_in():
     token = st.session_state.get("access_token")
-    headers = {
-        "Authorization": f"Bearer {token}"
-    }
+    headers = {"Authorization": f"Bearer {token}"}
     response = requests.get(AUTH_VALIDATE_API_URL, headers=headers)
 
     print(response.status_code)
-    print('iciii')
+    print("iciii")
     if response.status_code == 200:
         print(response.json())
         st.session_state.username = response.json().get("username")
@@ -77,17 +81,23 @@ def is_logged_in():
         st.session_state.username = None
     return False
 
+
 def store_token(token):
     import streamlit.components.v1 as components
-    components.html(f"""
+
+    components.html(
+        f"""
     <script>
         localStorage.setItem("access_token", "{token}");
         window.parent.location.reload();
     </script>
-    """, height=0)
+    """,
+        height=0,
+    )
+
 
 def get_css_styles() -> str:
-    """Retourne les styles CSS corrigés pour garder le contenu dans la bulle"""
+    """Retourne les styles CSS avec le logo intégré"""
     return """
     <style>
         /* Variables CSS */
@@ -107,7 +117,7 @@ def get_css_styles() -> str:
             --transition: all 0.3s ease;
         }
         
-        /* Reset Streamlit styles qui interfèrent */
+        /* Reset Streamlit styles */
         .main .block-container {
             padding-top: 2rem !important;
             padding-bottom: 2rem !important;
@@ -122,7 +132,7 @@ def get_css_styles() -> str:
         header {visibility: hidden;}
         .stDeployButton {display: none;}
         
-        /* Container principal de login - TOUT le contenu doit être dedans */
+        /* Container principal de login */
         .login-container {
             width: 100%;
             max-width: 420px;
@@ -135,14 +145,8 @@ def get_css_styles() -> str:
             position: relative;
             overflow: hidden;
             box-sizing: border-box;
-            /* Assurer que le contenu reste dans le container */
             contain: layout style;
             text-align: center;
-            color: var(--primary-blue-dark);
-            font-size: 2.5rem;
-            font-weight: 700;
-            letter-spacing: -0.5px;
-            line-height: 1;
         }
 
         /* Barre de gradient en haut */
@@ -157,36 +161,65 @@ def get_css_styles() -> str:
             z-index: 1;
         }
         
-        /* TOUS les éléments dans le container doivent avoir position relative et z-index > 1 */
-        .login-container > * {
+        /* Container du logo EXTÉRIEUR - en dehors de la bulle */
+        .logo-container-outside {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 2rem;
             position: relative;
-            z-index: 1;
+            z-index: 3;
         }
         
-        /* En-tête - DANS le container */
-        .login-header {
-            text-align: center;
+        /* Styles du logo - VERSION GRANDE */
+        .hospital-logo-large {
+            max-height: 120px;
+            max-width: 300px;
+            width: auto;
+            height: auto;
+            object-fit: contain;
+            filter: drop-shadow(0 4px 8px rgba(0,0,0,0.15));
+            transition: var(--transition);
+        }
+        
+        .hospital-logo-large:hover {
+            transform: scale(1.05);
+            filter: drop-shadow(0 6px 12px rgba(0,0,0,0.2));
+        }
+        
+        /* Titre de l'application - modifié pour s'harmoniser avec le logo */
+        .app-title {
             color: var(--primary-blue-dark);
-            font-size: 2.5rem;
+            font-size: 2.2rem;
             font-weight: 700;
-            margin: 0 0 0.5rem 0;
             letter-spacing: -0.5px;
-            line-height: 1.2;
+            line-height: 1;
+            margin: 0;
+            position: relative;
+            z-index: 2;
         }
         
+        /* Sous-titre */
         .login-subtitle {
             text-align: center;
             color: var(--text-light);
             font-size: 1rem;
             font-weight: 400;
-            margin: 0 0 2rem 0;
+            margin: 1rem 0 2rem 0;
             line-height: 1.4;
         }
         
-        /* Formulaire - DANS le container */
+        .login-subtitle strong {
+            color: var(--primary-blue);
+            font-weight: 600;
+        }
+        
+        /* Formulaire */
         .login-form {
             margin: 1.5rem 0;
             width: 100%;
+            position: relative;
+            z-index: 2;
         }
         
         /* Champs de saisie */
@@ -218,11 +251,13 @@ def get_css_styles() -> str:
             margin-bottom: 8px !important;
         }
         
-        /* Bouton de connexion - DANS le container */
+        /* Bouton de connexion */
         .login-button-container {
             margin: 1.5rem 0;
             text-align: center;
             width: 100%;
+            position: relative;
+            z-index: 2;
         }
         
         .stButton > button {
@@ -244,16 +279,31 @@ def get_css_styles() -> str:
             box-shadow: var(--shadow-medium) !important;
             background: linear-gradient(135deg, var(--primary-blue-dark) 0%, #003366 100%) !important;
         }
-        
-        /* Messages d'état - DANS le container */
+            
+        .centered-button-container {
+            display: flex;
+            justify-content: center;
+            margin: 1rem 0;
+        }
+
+        .centered-button-container .stButton > button {
+            width: auto !important;
+            min-width: 200px;
+            padding: 0.75rem 2rem !important;
+            text-align: center;
+        }
+
+        /* Messages d'état */
         .stAlert {
             border-radius: 8px !important;
             border: none !important;
             box-shadow: var(--shadow-light) !important;
             margin: 1rem 0 !important;
+            position: relative;
+            z-index: 2;
         }
         
-        /* Pied de page - DANS le container */
+        /* Pied de page */
         .footer-info {
             text-align: center;
             margin: 2rem 0 0 0;
@@ -261,6 +311,8 @@ def get_css_styles() -> str:
             border-top: 1px solid var(--border-color);
             color: var(--text-light);
             font-size: 0.85rem;
+            position: relative;
+            z-index: 2;
         }
         
         .footer-info p {
@@ -272,7 +324,7 @@ def get_css_styles() -> str:
             color: var(--primary-blue);
         }
         
-        /* Section démo - DANS le container si activée */
+        /* Section démo */
         .demo-info {
             background: linear-gradient(135deg, var(--primary-blue-light) 0%, #f0f8ff 100%);
             border-left: 4px solid var(--secondary-green);
@@ -282,6 +334,8 @@ def get_css_styles() -> str:
             box-shadow: var(--shadow-light);
             width: 100%;
             box-sizing: border-box;
+            position: relative;
+            z-index: 2;
         }
         
         .demo-info h4 {
@@ -356,96 +410,56 @@ def get_css_styles() -> str:
                 max-width: 95%;
             }
             
-            .login-header {
-                font-size: 2.2rem;
+            .hospital-logo-large {
+                max-height: 90px;
+                max-width: 220px;
             }
             
-            .login-subtitle {
-                font-size: 0.95rem;
+            .app-title {
+                font-size: 1.8rem;
             }
         }
         
-        /* Styles pour les success/error messages */
-        .stSuccess {
-            background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%) !important;
-            color: #155724 !important;
-        }
-        
-        .stError {
-            background: linear-gradient(135deg, #f8d7da 0%, #f1b0b7 100%) !important;
-            color: #721c24 !important;
-        }
-        
-        .stWarning {
-            background: linear-gradient(135deg, #fff3cd 0%, #fce8b2 100%) !important;
-            color: #856404 !important;
-        }
-        
-        .stInfo {
-            background: linear-gradient(135deg, #d1ecf1 0%, #bee5eb 100%) !important;
-            color: #0c5460 !important;
-        }
-        
-        /* Force tous les éléments Streamlit à rester dans le container */
-        .login-container .stTextInput,
-        .login-container .stButton,
-        .login-container .stAlert,
-        .login-container .stSuccess,
-        .login-container .stError,
-        .login-container .stWarning,
-        .login-container .stInfo {
-            width: 100% !important;
-            max-width: 100% !important;
-            box-sizing: border-box !important;
+        @media (max-width: 480px) {
+            .hospital-logo-large {
+                max-height: 70px;
+                max-width: 180px;
+            }
+            
+            .app-title {
+                font-size: 1.5rem;
+            }
         }
     </style>
     """
 
 
-def render_demo_accounts():
-    """Affiche la section des comptes de démonstration avec un design amélioré"""
-    st.markdown(
-        """
-        <div class="demo-info">
-            <h4>🔧 Comptes de démonstration disponibles</h4>
-    """,
-        unsafe_allow_html=True,
-    )
+def check_permission(required_permission: str) -> bool:
+    """Vérifie si l'utilisateur a une permission spécifique"""
+    user_permissions = st.session_state.get("user_permissions", [])
+    return required_permission in user_permissions
 
-    demo_accounts = [
-        {
-            "title": "👨‍💼 Administrateur complet",
-            "username": "admin",
-            "password": "admin123",
-            "description": "Accès à toutes les fonctionnalités",
-            "icon": "🔧",
-        },
-    ]
 
-    for account in demo_accounts:
-        st.markdown(
-            f"""
-            <div class="demo-account">
-                <div class="demo-account-title">
-                    {account["icon"]} {account["title"]}
-                </div>
-                <div style="color: #6c757d; font-size: 0.9rem; margin-bottom: 0.5rem;">
-                    {account["description"]}
-                </div>
-                <div class="demo-credentials">
-                    Utilisateur: <strong>{account["username"]}</strong><br>
-                    Mot de passe: <strong>{account["password"]}</strong>
-                </div>
-            </div>
-        """,
-            unsafe_allow_html=True,
-        )
+def render_user_info() -> None:
+    """Affiche les informations utilisateur dans la sidebar"""
+    with st.sidebar:
+        if st.session_state.get("username"):
+            st.success(f"🟢 Connecté: **{st.session_state.username}**")
 
-    st.markdown("</div>", unsafe_allow_html=True)
+            # Affichage du temps restant si disponible
+            if st.session_state.get("login_time"):
+                remaining_time = st.session_state.login_time
+                hours = remaining_time // 3600
+                minutes = (remaining_time % 3600) // 60
+                st.info(f"⏰ Session: {hours}h {minutes}min restantes")
+
+            # Bouton de déconnexion
+            if st.button("🚪 Se déconnecter", key="logout_button"):
+                logout()
 
 
 def render_login_page() -> None:
-    """Affiche la page de connexion avec design corrigé"""
+    """Affiche la page de connexion avec design corrigé et logo"""
 
     # Injection des styles CSS
     st.markdown(get_css_styles(), unsafe_allow_html=True)
@@ -461,22 +475,35 @@ def render_login_page() -> None:
             """,
             unsafe_allow_html=True,
         )
-    
-    # Conteneur principal - TOUT doit être à l'intérieur
-    # En-tête - DANS le container
+
+    # Logo en dehors de la bulle - plus grand
     st.markdown(
         """
-        <div class="login-container">SEQUAD</div>
+        <div class="logo-container-outside">
+            <img src="https://upload.wikimedia.org/wikipedia/fr/d/d4/Logo_HOPITAL_FOCH.png" 
+                 alt="Logo Hôpital Foch" 
+                 class="hospital-logo-large">
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # Conteneur principal SEQUAD
+    st.markdown(
+        """
+        <div class="login-container">
+            <div class="app-title">SEQUAD</div>
+        </div>
         <div class="login-subtitle">Sécurité, Évaluation et Qualité des Données<br>
-        <strong>Hôpital Foch - DRCI</strong></div>
-    """,
+        <strong>Hôpital Foch - DRCI - Unité Data</strong></div>
+        """,
         unsafe_allow_html=True,
     )
 
     # Formulaire de connexion - DANS le container
     with st.form("login_form", clear_on_submit=False):
         st.markdown('<div class="login-form">', unsafe_allow_html=True)
-        
+
         username = st.text_input(
             "👤 Nom d'utilisateur",
             placeholder="Entrez votre nom d'utilisateur",
@@ -493,7 +520,7 @@ def render_login_page() -> None:
         st.markdown('<div class="login-button-container">', unsafe_allow_html=True)
         login_button = st.form_submit_button("🚀 Se connecter", use_container_width=True)
         st.markdown("</div>", unsafe_allow_html=True)
-        
+
         st.markdown("</div>", unsafe_allow_html=True)
 
     # Traitement de la connexion avec feedback amélioré - DANS le container
@@ -507,108 +534,18 @@ def render_login_page() -> None:
                 store_token(response.json()["access_token"])
             elif response.status_code == 401:
                 st.error("Utilisateur ou mot de passe invalide.")
-                st.session_state.token = None  # Réinitialiser la session
             else:
-                st.error(f"Erreur de connexion au service d'authentification: {response.text}")
-
+                st.error(f"Erreur de connexion: {response.status_code}")
         else:
-            st.warning("⚠️ Veuillez remplir tous les champs")
-
-    # Section des comptes de démonstration - DANS le container si activée
-    if SHOW_DEMO_ACCOUNTS:
-        render_demo_accounts()
+            st.warning("Veuillez remplir tous les champs.")
 
     # Pied de page - DANS le container
     st.markdown(
         """
         <div class="footer-info">
-            <p><span class="hospital-name">🏥 Hôpital Foch - Unité Data - DRCI</span></p>
-            <p>Outil d'analyse des lettres de liaison patients</p>
-            <p><em>Version 2.0 - 2025</em></p>
-            <p><em>Sarra Ben Yahia</em></p>
+            <p><em>by Sarra Ben Yahia</em></p>
+
         </div>
-    """,
+        """,
         unsafe_allow_html=True,
     )
-
-    # Fermeture du container - TOUT doit être au-dessus de cette ligne
-    st.markdown("</div>", unsafe_allow_html=True)
-
-
-def render_user_info():
-    """Affiche les informations de l'utilisateur connecté dans la sidebar avec design amélioré"""
-    if "username" in st.session_state:
-        st.sidebar.markdown(get_css_styles(), unsafe_allow_html=True)
-        # Container avec style amélioré
-        st.sidebar.markdown(
-            f"""
-            <div class="user-info-container">
-                <div class="user-info-header">
-                    👤 Utilisateur connecté
-                </div>
-                <div class="user-name">{st.session_state.username}</div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-
-        # Informations de session améliorées
-        if "login_time" in st.session_state:
-            session_time = st.session_state.login_time
-
-            # Ensure session_time is a timedelta object
-            if isinstance(session_time, int):
-                session_time = timedelta(seconds=session_time)
-
-            hours_left = int(session_time.total_seconds() // 3600)
-            minutes_left = int((session_time.total_seconds() % 3600) // 60)
-
-            session_status = "🟢 Active"
-            if hours_left < 1:
-                session_status = "🟡 Expire bientôt"
-
-            st.sidebar.markdown(
-                f"""
-                <div class="session-info">
-                    <strong>{session_status}</strong><br>
-                    ⏰ Reste: {hours_left}h {minutes_left}m
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-
-        st.sidebar.markdown("<br>", unsafe_allow_html=True)
-
-        # Bouton de déconnexion amélioré
-        if st.sidebar.button("🚪 Se déconnecter", type="secondary", use_container_width=True):
-            logout()
-
-
-def check_permission(required_permission: str) -> bool:
-    """Vérifie si l'utilisateur a la permission requise"""
-    user_permissions = st.session_state.get("user_permissions", [])
-    return required_permission in user_permissions or "full_access" in user_permissions
-
-
-def show_permission_denied(required_permission: str):
-    """Affiche un message d'erreur de permission avec style amélioré"""
-    st.error(AUTH_MESSAGES["insufficient_permissions"])
-    st.info(f"🔐 **Permission requise :** {required_permission}")
-
-    # Suggestions d'amélioration de compte
-    current_permissions = st.session_state.get("user_permissions", [])
-    if current_permissions:
-        st.info(f"📋 **Vos permissions actuelles :** {', '.join(current_permissions)}")
-
-
-def show_toast(message: str, type_msg: str = "info"):
-    """Affiche une notification toast"""
-    if type_msg == "success":
-        st.success(message)
-    elif type_msg == "error":
-        st.error(message)
-    elif type_msg == "warning":
-        st.warning(message)
-    else:
-        st.info(message)

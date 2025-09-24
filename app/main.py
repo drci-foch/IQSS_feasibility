@@ -18,40 +18,47 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-st.markdown(custom_css, unsafe_allow_html=True)
-
 
 def main():
     # Vérifier l'authentification
-    # Lire le token injecté
     token = st_javascript("""(() => {
         return window.localStorage.getItem('access_token');
     })()""")
-    st.session_state['access_token'] = token
+    st.session_state["access_token"] = token
     if not is_logged_in():
         render_login_page()
         return
 
-    print('ici')
     # Afficher les informations utilisateur dans la sidebar
     render_user_info()
 
-    # En-tête principal (identique à l'original)
+    # CSS pour sidebar redimensionnable et styles du header
     st.markdown(
         """
         <style>
+            .logo-container {
+                text-align: center;
+                margin-bottom: 2rem;
+            }
+            .logo-container img {
+                height: 150px;
+                width: auto;
+                object-fit: contain;
+            }
             .main-header {
-                font-size: 2.5em;
+                font-size: 3em;
                 font-weight: bold;
                 text-align: center;
                 color: #2c3e50;
-                margin-bottom: 20px;
+                margin-bottom: 30px;
             }
             .description {
-                font-size: 1.2em;
+                font-size: 1.4em;
                 line-height: 1.6;
                 color: #34495e;
                 text-align: center;
+                max-width: 800px;
+                margin: 0 auto;
             }
             .permission-warning {
                 background-color: #fff3cd;
@@ -66,18 +73,20 @@ def main():
         unsafe_allow_html=True,
     )
 
+    # Header simple avec logo centré
     st.markdown(
-        "<h1 class='main-header'>SEQUAD : Sécurité, Évaluation et Qualité des Données</h1>",
+        """
+        <div class="logo-container">
+            <img src="https://upload.wikimedia.org/wikipedia/fr/d/d4/Logo_HOPITAL_FOCH.png" 
+                 alt="Logo Hôpital Foch" 
+                 onerror="this.style.display='none'">
+        </div>
+        """,
         unsafe_allow_html=True,
     )
 
     st.markdown(
-        """
-        <p class='description'>
-            SEQUAD est un outil dédié à l'analyse des lettres de liaison patients validées,
-            ainsi qu'à leur diffusion sécurisée via Lifen.
-        </p>
-        """,
+        "<h1 class='main-header'>SEQUAD : Sécurité, Évaluation et Qualité des Données</h1>",
         unsafe_allow_html=True,
     )
 
@@ -254,7 +263,7 @@ def render_initial_tabs_with_permissions():
         with tabs[tab_index]:
             st.info(
                 "Utilisez la barre latérale pour configurer votre requête, puis cliquez sur 'Exécuter la Requête' "
-                "pour voir les résultats."
+                "pour visualiser les résultats."
             )
         tab_index += 1
 
